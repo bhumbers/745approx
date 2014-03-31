@@ -12,7 +12,7 @@ saveFuncResults = True
 resultsDir = './results'
 
 #TODO: Read JSON config with
-# - Input function inResFiles
+# - Input function(s) to approximate
 #   - Output file names (if provided, else use defaults)
 #   - Input generators of some sort...
 # - Approximation config parameters (which to try, what params to use for each)
