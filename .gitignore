@@ -1,5 +1,12 @@
 *.py[cod]
 
+# Various data input/output folders
+/approx
+/results
+
+# PyCharm project stuff
+.idea
+
 # C extensions
 *.so
 
