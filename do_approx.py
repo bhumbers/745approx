@@ -29,13 +29,12 @@ resultsDir = './results'
 #   - Input generators of some sort...
 # - Approximation config parameters (which to try, what params to use for each)
 #PLACEHOLDER: Basic lib loading & execution (run "./inputs/make" before this)
-inputLibFile = "./inputs/basic.so"
 inputFunc = "basic_example"
 inputFuncSource = "./inputs/basic.c" #only needed for DummyApproxGenerator
 
 #PLACEHOLDER: Generate some arbitrary inputs (one row per call)
 numInputTests = 5   # number of distinct input instances to test
-inputLen = 3        # length of each input array
+inputLen = 100        # length of each input array
 numOutRows = 3     # Size in rows of grid output
 numOutCols = 3     # Size in cols of grid output
 funcInputs = np.zeros([numInputTests, inputLen])
@@ -47,11 +46,9 @@ funcOutput = np.zeros([numOutRows, numOutCols])
 if (saveFuncResults):
   ioutils.mkdir_p(resultsDir)
 
-inputLib = CDLL(inputLibFile)
-
 #Define the C function interface nicely
 #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
-orig_func = inputLib[inputFunc]
+orig_func = func_compiler.compile(inputFuncSource, inputFunc)
 set_signature(orig_func)
 
 #ORIGNAL FUNCTION: Compute grid output for each input row
@@ -79,6 +76,7 @@ for inResFile in inResFiles:
 for outResFile in outResFiles:
   outList.append(np.load(outResFile))
 inArray = np.vstack(inList) if len(inList) > 0 else []
+outArray3d = np.dstack(outList) if len(outList) > 0 else []
 
 #Split data into training & test sets
 #PLACEHOLDER: Basic split
@@ -87,9 +85,9 @@ trainingPercent = 0.9
 Ntrain = math.floor(N * 0.9)
 Ntest = N - Ntrain
 trainIn = inArray[1:Ntrain,:]
-trainOutList = outList[1:Ntrain]
+trainOut = outArray3d[:,:,1:Ntrain]
 testIn = inArray[Ntrain+1:,:]
-testOutList = outList[Ntrain+1:]
+testOut = outArray3d[:,:,Ntrain+1:]
 
 
 #Then train & generate outputs for different generators
@@ -98,17 +96,17 @@ approximators = [(DummyApproxGenerator(inputFuncSource), 'dummy')]
 approx_output_dir = './approx'
 approx_files = []
 for approx_info in approximators:
+  approx_name = approx_info[1];
   approx_file = approx_output_dir + approx_name + '.c'
   approx = approx_info[0]
-  approx_name = approx_info[1]
-  approx.train(trainIn, trainOutList)
-  approx.generate(approx_file)
+  approx.train(trainIn, trainOut)
+  approx.generate(approx_output_dir, approx_name+'.c')
   approx_files.append(approx_file)
 
 #For each approximator, evaluate approximator quality on test set, save or show to console
 approx_errors = []
 for approx_file in approx_files:
-  approx_func = func_compiler.compile(approx_file)
+  approx_func = func_compiler.compile(approx_file, inputFunc)
   set_signature(approx_func)
   #Find error of each approximation output compared to the original output
   for inputIdx, inputRow in enumerate(testIn):

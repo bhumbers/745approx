@@ -19,7 +19,7 @@ class DummyApproxGenerator(ApproxGenerator):
   def train(self, inputs, outputsList):
     pass
 
-  def generate(self, out_file = '.'):
+  def generate(self, out_path, out_file):
     #Dummy: Just write a duplicate of the original file
-    ioutils.mkdir_p(path)
-    shutil.copy2(self.orig_func_filepath, out_file)
+    ioutils.mkdir_p(out_path)
+    shutil.copy2(self.orig_func_filepath, out_path+out_file)

@@ -16,11 +16,11 @@ class ApproxGenerator:
     pass
 
   @abc.abstractmethod
-  def train(self, inputs, outputsList):
+  def train(self, inputs, outputs):
     """Trains this generator to approximate function for given test cases
     inputs should be a 2D array where each row is an individual test input
-    outputsList should be a list of the expected 2D grid output,
-    where each entry is the 2D grid output for the corresponding input row
+    outputsList should be a 3D array where the test outputs are 2D arrays
+    and indexed by the third dimension
     """
 
     #NOTE: Feel free to do just about anything here, like gen & compling temp
@@ -31,7 +31,7 @@ class ApproxGenerator:
     pass
 
   @abc.abstractmethod
-  def generate(self, out_file = '.'):
+  def generate(self, out_path, out_file):
     """
     Writes a C file which represents this trained approximation to specified file
     """
