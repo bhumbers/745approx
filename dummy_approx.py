@@ -13,13 +13,13 @@ class DummyApproxGenerator(ApproxGenerator):
   def __init__(self, orig_func_filepath):
     self.orig_func_filepath = orig_func_filepath
 
-  def typename(sef):
+  def typename(self):
     return "dummy"
 
   def train(self, inputs, outputsList):
     pass
 
-  def generate(self, path = '.'):
-    #Write a duplicate of the original file
+  def generate(self, out_file = '.'):
+    #Dummy: Just write a duplicate of the original file
     ioutils.mkdir_p(path)
-    shutil.copy2(self.orig_func_filepath, path + "/" + self.typename() + ".c")
+    shutil.copy2(self.orig_func_filepath, out_file)

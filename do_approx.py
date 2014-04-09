@@ -2,9 +2,21 @@
 
 from ctypes import *
 import numpy as np
+from numpy import linalg as LA
 import ioutils
+import func_compiler
+import math
 
 from dummy_approx import DummyApproxGenerator
+
+#Sets inputs, outputs, etc. for bound ctype function for our approximator signature
+def set_signature(func_handle):
+  func_handle.restype = None
+  func_handle.argtypes = [np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
+                   c_int,
+                   np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
+                   c_int,
+                   c_int]
 
 #Script to execute approximation function generation for a given C/C++ function (in a shared lib)
 
@@ -39,18 +51,13 @@ inputLib = CDLL(inputLibFile)
 
 #Define the C function interface nicely
 #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
-func = inputLib[inputFunc]
-func.restype = None
-func.argtypes = [np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
-                 c_int,
-                 np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
-                 c_int,
-                 c_int]
+orig_func = inputLib[inputFunc]
+set_signature(orig_func)
 
 #ORIGNAL FUNCTION: Compute grid output for each input row
 for testIdx, inputRow in enumerate(funcInputs):
   funcOutput[:] = 0   #reset output before executing this call
-  func(inputRow, inputRow.size, funcOutput, numOutRows, numOutCols)
+  orig_func(inputRow, inputRow.size, funcOutput, numOutRows, numOutCols)
   print(('Input #%d: \n' + str(inputRow) + '\n') % testIdx)
   print('Output: \n' + str(funcOutput) + '\n')
   if saveFuncResults:
@@ -73,15 +80,46 @@ for outResFile in outResFiles:
   outList.append(np.load(outResFile))
 inArray = np.vstack(inList) if len(inList) > 0 else []
 
-#TODO: Split data into training & test sets
+#Split data into training & test sets
+#PLACEHOLDER: Basic split
+N = inArray.shape[0]
+trainingPercent = 0.9
+Ntrain = math.floor(N * 0.9)
+Ntest = N - Ntrain
+trainIn = inArray[1:Ntrain,:]
+trainOutList = outList[1:Ntrain]
+testIn = inArray[Ntrain+1:,:]
+testOutList = outList[Ntrain+1:]
+
 
 #Then train & generate outputs for different generators
 #PLACEHOLDER: Output just dummy generator
-approximators = [DummyApproxGenerator(inputFuncSource)]
-for approx in approximators:
-  approx.train(inArray, outList)
-  approx.generate('./approx')
+approximators = [(DummyApproxGenerator(inputFuncSource), 'dummy')]
+approx_output_dir = './approx'
+approx_files = []
+for approx_info in approximators:
+  approx_file = approx_output_dir + approx_name + '.c'
+  approx = approx_info[0]
+  approx_name = approx_info[1]
+  approx.train(trainIn, trainOutList)
+  approx.generate(approx_file)
+  approx_files.append(approx_file)
 
-# TODO: For each approximator, evaluate approximator quality on test set, save or show to console
+#For each approximator, evaluate approximator quality on test set, save or show to console
+approx_errors = []
+for approx_file in approx_files:
+  approx_func = func_compiler.compile(approx_file)
+  set_signature(approx_func)
+  #Find error of each approximation output compared to the original output
+  for inputIdx, inputRow in enumerate(testIn):
+    orig_output = testOutList[inputIdx]
+    (out_rows, out_cols) = orig_output.shape
+    approx_output = np.zeros(out_rows, out_cols)
+    approx_func(inputRow, inputRow.size, approx_output, out_rows, out_cols)
+    error = LA.norm(approx_output - orig_output)
+    approx_errors.append(error)
 
-
+print('APPROX ERRORS:')
+for approxIdx, approx_error in enumerate(approx_errors):
+  approx_name = approximators[approxIdx][1]
+  print('  %s: %f' % (approx_name, approx_error))

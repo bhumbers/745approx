@@ -31,9 +31,8 @@ class ApproxGenerator:
     pass
 
   @abc.abstractmethod
-  def generate(self, path = '.'):
+  def generate(self, out_file = '.'):
     """
-    Writes a C file which represents this trained approximation to current
-    directory (or path if given). Output file will be $(name).c
+    Writes a C file which represents this trained approximation to specified file
     """
     pass
