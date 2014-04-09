@@ -30,13 +30,13 @@ resultsDir = './results'
 # - Approximation config parameters (which to try, what params to use for each)
 #PLACEHOLDER: Basic lib loading & execution (run "./inputs/make" before this)
 inputFunc = "basic_example"
-inputFuncSource = "./inputs/basic.c" #only needed for DummyApproxGenerator
+inputFuncSource = "./inputs/basic.c" #  only needed for DummyApproxGenerator
 
 #PLACEHOLDER: Generate some arbitrary inputs (one row per call)
-numInputTests = 5   # number of distinct input instances to test
-inputLen = 100        # length of each input array
-numOutRows = 3     # Size in rows of grid output
-numOutCols = 3     # Size in cols of grid output
+numInputTests = 100   # number of distinct input instances to test
+inputLen = 5        # length of each input array
+numOutRows = 10     # Size in rows of grid output
+numOutCols = 10     # Size in cols of grid output
 funcInputs = np.zeros([numInputTests, inputLen])
 for i in range(numInputTests):
   for j in range(inputLen):
@@ -55,8 +55,8 @@ set_signature(orig_func)
 for testIdx, inputRow in enumerate(funcInputs):
   funcOutput[:] = 0   #reset output before executing this call
   orig_func(inputRow, inputRow.size, funcOutput, numOutRows, numOutCols)
-  print(('Input #%d: \n' + str(inputRow) + '\n') % testIdx)
-  print('Output: \n' + str(funcOutput) + '\n')
+  # print(('Input #%d: \n' + str(inputRow) + '\n') % testIdx)
+  # print('Output: \n' + str(funcOutput) + '\n')
   if saveFuncResults:
     np.save(resultsDir + '/' + inputFunc + '_%04d.in' % testIdx, inputRow)
     np.save(resultsDir + '/' + inputFunc + '_%04d.out' % testIdx, funcOutput)
@@ -89,35 +89,39 @@ trainOut = outArray3d[:,:,1:Ntrain]
 testIn = inArray[Ntrain+1:,:]
 testOut = outArray3d[:,:,Ntrain+1:]
 
-
-#Then train & generate outputs for different generators
-#PLACEHOLDER: Output just dummy generator
-approximators = [(DummyApproxGenerator(inputFuncSource), 'dummy')]
-approx_output_dir = './approx'
+#Then train & generate approximator outputs for different generators
+#PLACEHOLDER: Output just dummy approximator
+approximators = [
+    (DummyApproxGenerator(inputFuncSource), 'dummy')
+  ]
+approx_output_dir = './approx/'
 approx_files = []
 for approx_info in approximators:
-  approx_name = approx_info[1];
-  approx_file = approx_output_dir + approx_name + '.c'
   approx = approx_info[0]
+  approx_name = approx_info[1]
+  approx_file = approx_name + '.c'
   approx.train(trainIn, trainOut)
-  approx.generate(approx_output_dir, approx_name+'.c')
-  approx_files.append(approx_file)
+  approx.generate(approx_output_dir, approx_file)
+  approx_files.append(approx_output_dir + approx_file)
 
 #For each approximator, evaluate approximator quality on test set, save or show to console
 approx_errors = []
 for approx_file in approx_files:
   approx_func = func_compiler.compile(approx_file, inputFunc)
   set_signature(approx_func)
+
+  approx_errors_by_test = np.zeros(len(testIn))
   #Find error of each approximation output compared to the original output
   for inputIdx, inputRow in enumerate(testIn):
-    orig_output = testOutList[inputIdx]
+    orig_output = testOut[:,:,inputIdx]
     (out_rows, out_cols) = orig_output.shape
-    approx_output = np.zeros(out_rows, out_cols)
-    approx_func(inputRow, inputRow.size, approx_output, out_rows, out_cols)
+    approx_output = np.zeros([out_rows, out_cols])
+    # approx_func(inputRow, inputRow.size, approx_output, out_rows, out_cols)
     error = LA.norm(approx_output - orig_output)
-    approx_errors.append(error)
+    approx_errors_by_test[inputIdx] = error
+  approx_errors.append(np.average(approx_errors_by_test))
 
-print('APPROX ERRORS:')
+print('AVERAGE APPROX ERRORS:')
 for approxIdx, approx_error in enumerate(approx_errors):
   approx_name = approximators[approxIdx][1]
   print('  %s: %f' % (approx_name, approx_error))
