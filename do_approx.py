@@ -7,6 +7,11 @@ import ioutils
 import func_compiler
 import math
 
+import random
+
+import os
+import shutil
+
 from collections import namedtuple
 
 # from dummy_approx import DummyApproxGenerator
@@ -25,6 +30,9 @@ ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'param
 
 #Script to execute approximation function generation for a given C/C++ function (in a shared lib)
 
+rnd = random.Random()
+rnd.seed(42)
+
 saveFuncResults = True
 resultsDir = './results'
 
@@ -34,8 +42,8 @@ resultsDir = './results'
 #   - Input generators of some sort...
 # - Approximation config parameters (which to try, what params to use for each)
 #PLACEHOLDER: Basic lib loading & execution (run "./inputs/make" before this)
-inputFunc = "basic_example"
-inputFuncSource = "./inputs/basic.c" #  only needed for DummyApproxGenerator
+inputFunc = 'sum_of_gaussians'  #"basic_example"
+inputFuncSource = './inputs/gaussian.c' #"./inputs/basic.c"
 
 #Set up approximator configs of interest
 #TODO: Shift these out to JSON config files, if convenient
@@ -46,14 +54,18 @@ approx_configs = [
 
 
 #PLACEHOLDER: Generate some arbitrary inputs (one row per call)
-numInputTests = 100   # number of distinct input instances to test
-inputLen = 5        # length of each input array
-numOutRows = 10     # Size in rows of grid output
-numOutCols = 10     # Size in cols of grid output
+numInputTests = 2     # number of distinct input instances to test
+inputLen = 5            # length of each input array
+numOutRows = 10         # Size in rows of grid output
+numOutCols = 10         # Size in cols of grid output
 funcInputs = np.zeros([numInputTests, inputLen])
 for i in range(numInputTests):
-  for j in range(inputLen):
-    funcInputs[i, j] = i
+  #Simple Gaussian centered in middle of grid (normalized [0,1] range)
+  funcInputs[i, 0] = rnd.random()  #mean
+  funcInputs[i, 1] = rnd.random()
+  funcInputs[i, 2] = 0.2  #variance
+  funcInputs[i, 3] = 0.4
+  funcInputs[i, 4] = 3    #amplitude
 funcOutput = np.zeros([numOutRows, numOutCols])
 
 if (saveFuncResults):
@@ -65,6 +77,8 @@ orig_func = func_compiler.compile(inputFuncSource, inputFunc)
 set_signature(orig_func)
 
 #ORIGNAL FUNCTION: Compute grid output for each input row
+shutil.rmtree(resultsDir)
+os.makedirs(resultsDir)
 for testIdx, inputRow in enumerate(funcInputs):
   funcOutput[:] = 0   #reset output before executing this call
   orig_func(inputRow, inputRow.size, funcOutput, numOutRows, numOutCols)
@@ -94,13 +108,13 @@ outArray3d = np.dstack(outList) if len(outList) > 0 else []
 #Split data into training & test sets
 #PLACEHOLDER: Basic split
 N = inArray.shape[0]
-trainingPercent = 0.9
-Ntrain = math.floor(N * 0.9)
+trainingPercent = 0.5
+Ntrain = math.floor(N * trainingPercent)
 Ntest = N - Ntrain
-trainIn = inArray[1:Ntrain,:]
-trainOut = outArray3d[:,:,1:Ntrain]
-testIn = inArray[Ntrain+1:,:]
-testOut = outArray3d[:,:,Ntrain+1:]
+trainIn = inArray[0:Ntrain,:]
+trainOut = outArray3d[:,:,0:Ntrain]
+testIn = inArray[Ntrain:,:]
+testOut = outArray3d[:,:,Ntrain:]
 
 #Then train & generate approximator outputs for different generators
 
@@ -128,8 +142,8 @@ for approx_file in approx_files:
     orig_output = testOut[:,:,inputIdx]
     (out_rows, out_cols) = orig_output.shape
     approx_output = np.zeros([out_rows, out_cols])
-    # approx_func(inputRow, inputRow.size, approx_output, out_rows, out_cols)
-    error = LA.norm(approx_output - orig_output)
+    approx_func(inputRow, inputRow.size, approx_output, out_rows, out_cols)
+    error = LA.norm((approx_output - orig_output))
     approx_errors_by_test[inputIdx] = error
   approx_errors.append(np.average(approx_errors_by_test))
 
