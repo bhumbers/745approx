@@ -31,7 +31,7 @@ class ApproxGenerator:
     pass
 
   @abc.abstractmethod
-  def generate(self, out_path, out_file):
+  def generate(self, out_path, out_file, out_func_name):
     """
     Writes a C file which represents this trained approximation to specified file
     """

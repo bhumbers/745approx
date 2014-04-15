@@ -7,7 +7,10 @@ import ioutils
 import func_compiler
 import math
 
-from dummy_approx import DummyApproxGenerator
+from collections import namedtuple
+
+# from dummy_approx import DummyApproxGenerator
+# from lookup_approx import LookupApproxGenerator
 
 #Sets inputs, outputs, etc. for bound ctype function for our approximator signature
 def set_signature(func_handle):
@@ -17,6 +20,8 @@ def set_signature(func_handle):
                    np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
                    c_int,
                    c_int]
+
+ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
 
 #Script to execute approximation function generation for a given C/C++ function (in a shared lib)
 
@@ -31,6 +36,14 @@ resultsDir = './results'
 #PLACEHOLDER: Basic lib loading & execution (run "./inputs/make" before this)
 inputFunc = "basic_example"
 inputFuncSource = "./inputs/basic.c" #  only needed for DummyApproxGenerator
+
+#Set up approximator configs of interest
+#TODO: Shift these out to JSON config files, if convenient
+approx_configs = [
+    ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': inputFuncSource}),
+    ApproxConfig('linear_approx', 'LinearApproxGenerator', 'lookup', {'tableSizePerDim': 100})
+  ]
+
 
 #PLACEHOLDER: Generate some arbitrary inputs (one row per call)
 numInputTests = 100   # number of distinct input instances to test
@@ -90,19 +103,18 @@ testIn = inArray[Ntrain+1:,:]
 testOut = outArray3d[:,:,Ntrain+1:]
 
 #Then train & generate approximator outputs for different generators
-#PLACEHOLDER: Output just dummy approximator
-approximators = [
-    (DummyApproxGenerator(inputFuncSource), 'dummy')
-  ]
-approx_output_dir = './approx/'
+
+approx_out_dir = './approx/'
 approx_files = []
-for approx_info in approximators:
-  approx = approx_info[0]
-  approx_name = approx_info[1]
-  approx_file = approx_name + '.c'
-  approx.train(trainIn, trainOut)
-  approx.generate(approx_output_dir, approx_file)
-  approx_files.append(approx_output_dir + approx_file)
+for approx_config in approx_configs:
+  approx_name = approx_config.name
+  approx_out_file = approx_name + '.c'
+  approx_module = __import__(approx_config.module)
+  approx_gen_class = getattr(approx_module, approx_config.gen_class)
+  approx_gen = approx_gen_class(approx_config.params)
+  approx_gen.train(trainIn, trainOut)
+  approx_gen.generate(approx_out_dir, approx_out_file, inputFunc)
+  approx_files.append(approx_out_dir + approx_out_file)
 
 #For each approximator, evaluate approximator quality on test set, save or show to console
 approx_errors = []
@@ -123,5 +135,5 @@ for approx_file in approx_files:
 
 print('AVERAGE APPROX ERRORS:')
 for approxIdx, approx_error in enumerate(approx_errors):
-  approx_name = approximators[approxIdx][1]
+  approx_name = approx_configs[approxIdx][1]
   print('  %s: %f' % (approx_name, approx_error))
