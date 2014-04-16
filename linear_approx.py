@@ -21,9 +21,9 @@ class LinearApproxGenerator(ApproxGenerator):
     return "linear"
 
   def train(self, inputs, outputs):
-    n_r = outputs.shape[0]    #size of output grid in rows
-    n_c = outputs.shape[1]    #size of output grid in cols
     p = inputs.shape[1]       #number of input features
+    n_r = outputs.shape[1]    #size of output grid in rows
+    n_c = outputs.shape[2]    #size of output grid in cols
     #n = inputs.shape[0]       #number of observations (this should be the same as outputs.shape[2])
 
     self.weights = np.zeros([n_r,n_c,p+1])
@@ -31,7 +31,7 @@ class LinearApproxGenerator(ApproxGenerator):
     #Train the linear weights for each output entry
     for r in xrange(n_r):
       for c in xrange(n_c):
-        y = outputs[r,c,:] #output values for this cell over all observations
+        y = outputs[:,r,c] #output values for this cell over all observations
         X = inputs
         regr = linear_model.LinearRegression(fit_intercept=True, normalize=False)
         regr.fit(X, y)

@@ -20,7 +20,7 @@ class ApproxGenerator:
     """Trains this generator to approximate function for given test cases
     inputs should be a 2D array where each row is an individual test input
     outputsList should be a 3D array where the test outputs are 2D arrays
-    and indexed by the third dimension
+    and indexed by the first dimension
     """
 
     #NOTE: Feel free to do just about anything here, like gen & compling temp
