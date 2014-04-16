@@ -2,8 +2,6 @@
 
 from ctypes import *
 import numpy as np
-from numpy import linalg as LA
-import ioutils
 import func_compiler
 import math
 
@@ -16,6 +14,8 @@ from sklearn.metrics import mean_squared_error
 from math import sqrt
 
 from collections import namedtuple
+
+import timeit
 
 ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
 
@@ -44,7 +44,12 @@ def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
       func_inputs[i, offset+4] = 3              #amplitude
   return func_inputs
 
-def compute_func_results(func_inputs, out_rows, out_cols, results_dir):
+def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir):
+  #Define the C function interface nicely
+  #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
+  orig_func = func_compiler.compile(func_source, func_name)
+  set_signature(orig_func)
+
   save_results = True
   func_output = np.zeros([out_rows, out_cols])
   if (save_results):
@@ -110,9 +115,36 @@ def get_approx_errors(approx_files, func_name, testIn, testOut):
 
   print('RMSE BY APPROXIMATOR:')
   for approxIdx, approx_error in enumerate(approx_errors):
-    approx_name = approx_configs[approxIdx][1]
+    approx_name = approx_files[approxIdx]
     print('  %s: %f' % (approx_name, approx_error))
   return approx_errors
+
+def get_approx_timing(approx_files, func_name, func_inputs, out_rows, out_cols):
+  approx_timings = []
+  for approx_file in approx_files:
+    approx_timings.append(profile_function_speed(approx_file, func_name, func_inputs, out_rows, out_cols))
+
+  print('TIME TO EXECUTE %d FUNCTION CALLS BY APPROXIMATOR:' % func_inputs.shape[0])
+  for approxIdx, approx_timing in enumerate(approx_timings):
+    approx_name = approx_files[approxIdx]
+    print('  %s: %f' % (approx_name, approx_timing))
+  return approx_timings
+
+  # print('Profiled time to run %d inputs for source %s: %f' % (func_inputs.shape[0], func_source, runtime))
+
+def profile_function_speed(func_source, func_name, func_inputs, out_rows, out_cols):
+  func = func_compiler.compile(func_source, func_name)
+  set_signature(func)
+
+  def run_on_inputs(func, func_inputs, out_rows, out_cols):
+    func_output = np.zeros([out_rows, out_cols])
+    for inputIdx, inputRow in enumerate(func_inputs):
+      # func_output[:] = 0   #reset output before executing this call
+      func(inputRow, inputRow.size, func_output, out_rows, out_cols)
+
+  t = timeit.Timer(lambda: run_on_inputs(func, func_inputs, out_rows, out_cols))
+  runtime = t.timeit(number=1)
+  return runtime
 
 
 if __name__ == '__main__':
@@ -128,10 +160,9 @@ if __name__ == '__main__':
   results_dir = './results'
 
   #Set up approximator configs of interest
-  #TODO: Shift these out to JSON config files, if convenient
   approx_configs = [
       ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source}),
-      ApproxConfig('linear_approx', 'LinearApproxGenerator', 'lookup', {'tableSizePerDim': 100})
+      ApproxConfig('linear_approx', 'LinearApproxGenerator', 'linear', {})
     ]
 
   #Generate some random sum-of-Gaussians inputs
@@ -139,15 +170,10 @@ if __name__ == '__main__':
   num_gaussians = 3
   func_inputs = generate_sum_of_gaussians_inputs(num_inputs, num_gaussians)
 
-  #Define the C function interface nicely
-  #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
-  orig_func = func_compiler.compile(func_source, func_name)
-  set_signature(orig_func)
-
   #ORIGNAL FUNCTION: Compute grid output for each input row
-  out_rows = 10             # Size in rows of grid output
-  out_cols = 10             # Size in cols of grid output
-  compute_func_results(func_inputs, out_rows, out_cols, results_dir)
+  out_rows = 100             # Size in rows of grid output
+  out_cols = 100             # Size in cols of grid output
+  compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir)
 
   #APPROXIMATORS: Train & generate C function to replace original function
   # (NOTE: This part can & should be split out from in/out pair generation for original function)
@@ -168,4 +194,6 @@ if __name__ == '__main__':
   approx_files = generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir)
 
   #Approximator evaluation
-  get_approx_errors(approx_files, func_name, testIn, testOut)
+  # get_approx_errors(approx_files, func_name, testIn, testOut)
+  get_approx_timing(approx_files, func_name, testIn, out_rows, out_cols)
+
