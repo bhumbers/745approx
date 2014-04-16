@@ -185,6 +185,7 @@ if __name__ == '__main__':
 
 
   results_dir = './results'
+  num_inputs = 10000
 
   # Option #1: Sum-of-Gaussians
   func_name = 'sum_of_gaussians'
@@ -204,13 +205,12 @@ if __name__ == '__main__':
 
   #Generate some random sum-of-Gaussians inputs
   print('Input generation...')
-  num_inputs = 10000
   func_inputs = input_gen()
 
   #ORIGNAL FUNCTION: Compute grid output for each input row
   print('Computing original function results...')
-  out_rows = 100            # Size in rows of grid output
-  out_cols = 100             # Size in cols of grid output
+  out_rows = 10            # Size in rows of grid output
+  out_cols = 10             # Size in cols of grid output
   compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir)
 
   #APPROXIMATORS: Train & generate C function to replace original function
