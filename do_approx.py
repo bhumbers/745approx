@@ -44,6 +44,20 @@ def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
       func_inputs[i, offset+4] = 3              #amplitude
   return func_inputs
 
+def generate_mdp_inputs(num_inputs, num_rewards):
+  rnd = random.Random()
+  rnd.seed(42)
+  input_length =   3*num_rewards # length of each input array
+  func_inputs = np.zeros([num_inputs, input_length])
+  for i in xrange(num_inputs):
+    #Lay out some rewards
+    for j in xrange(num_rewards):
+      offset = 3*j
+      func_inputs[i, offset+0] = rnd.random()   #position
+      func_inputs[i, offset+1] = rnd.random()
+      func_inputs[i, offset+2] = rnd.random()  #reward
+  return func_inputs
+
 def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir):
   #Define the C function interface nicely
   #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
@@ -155,8 +169,8 @@ if __name__ == '__main__':
   #   - Output file names (if provided, else use defaults)
   #   - Input generators of some sort...
   # - Approximation config parameters (which to try, what params to use for each)
-  func_name = 'sum_of_gaussians'  #"basic_example"
-  func_source = './inputs/gaussian.c' #"./inputs/basic.c"
+  func_name = 'compute_mdp_values'  #"basic_example"
+  func_source = './inputs/mdp.c' #"./inputs/basic.c"
   results_dir = './results'
 
   #Set up approximator configs of interest
@@ -168,7 +182,8 @@ if __name__ == '__main__':
   #Generate some random sum-of-Gaussians inputs
   num_inputs = 1000
   num_gaussians = 3
-  func_inputs = generate_sum_of_gaussians_inputs(num_inputs, num_gaussians)
+  # func_inputs = generate_sum_of_gaussians_inputs(num_inputs, num_gaussians)
+  func_inputs = generate_mdp_inputs(num_inputs, 3)
 
   #ORIGNAL FUNCTION: Compute grid output for each input row
   out_rows = 100             # Size in rows of grid output
@@ -196,4 +211,3 @@ if __name__ == '__main__':
   #Approximator evaluation
   # get_approx_errors(approx_files, func_name, testIn, testOut)
   get_approx_timing(approx_files, func_name, testIn, out_rows, out_cols)
-
