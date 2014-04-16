@@ -12,6 +12,9 @@ import random
 import os
 import shutil
 
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+
 from collections import namedtuple
 
 # from dummy_approx import DummyApproxGenerator
@@ -54,7 +57,7 @@ approx_configs = [
 
 
 #PLACEHOLDER: Generate some arbitrary inputs (one row per call)
-numInputTests = 2     # number of distinct input instances to test
+numInputTests = 10000   # number of distinct input instances to test
 inputLen = 5            # length of each input array
 numOutRows = 10         # Size in rows of grid output
 numOutCols = 10         # Size in cols of grid output
@@ -143,11 +146,11 @@ for approx_file in approx_files:
     (out_rows, out_cols) = orig_output.shape
     approx_output = np.zeros([out_rows, out_cols])
     approx_func(inputRow, inputRow.size, approx_output, out_rows, out_cols)
-    error = LA.norm((approx_output - orig_output))
+    error = sqrt(mean_squared_error(orig_output, approx_output)) #RMSE. We probably want to normalize this as well...
     approx_errors_by_test[inputIdx] = error
   approx_errors.append(np.average(approx_errors_by_test))
 
-print('AVERAGE APPROX ERRORS:')
+print('RMSE BY APPROXIMATOR:')
 for approxIdx, approx_error in enumerate(approx_errors):
   approx_name = approx_configs[approxIdx][1]
   print('  %s: %f' % (approx_name, approx_error))
