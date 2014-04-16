@@ -17,8 +17,7 @@ from math import sqrt
 
 from collections import namedtuple
 
-# from dummy_approx import DummyApproxGenerator
-# from lookup_approx import LookupApproxGenerator
+ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
 
 #Sets inputs, outputs, etc. for bound ctype function for our approximator signature
 def set_signature(func_handle):
@@ -28,8 +27,6 @@ def set_signature(func_handle):
                    np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
                    c_int,
                    c_int]
-
-ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
 
 def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
   rnd = random.Random()
@@ -49,10 +46,9 @@ def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
 
 def compute_func_results(func_inputs, out_rows, out_cols, results_dir):
   save_results = True
-  num_inputs = func_inputs.shape[0]
   func_output = np.zeros([out_rows, out_cols])
   if (save_results):
-    shutil.rmtree(results_dir)
+    shutil.rmtree(results_dir) #clear any existing results data
     os.makedirs(results_dir)
   for inputIdx, inputRow in enumerate(func_inputs):
     func_output[:] = 0   #reset output before executing this call
@@ -79,6 +75,20 @@ def load_func_in_out_data(results_dir):
   inArray = np.vstack(inList) if len(inList) > 0 else []
   outArray = np.dstack(outList) if len(outList) > 0 else []
   return inArray, outArray
+
+#Train & write C function approximators of named function & return a list of generated approximator source files
+def generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir):
+  approx_files = []
+  for approx_config in approx_configs:
+    approx_name = approx_config.name
+    approx_out_file = approx_name + '.c'
+    approx_module = __import__(approx_config.module)
+    approx_gen_class = getattr(approx_module, approx_config.gen_class)
+    approx_gen = approx_gen_class(approx_config.params)
+    approx_gen.train(trainIn, trainOut)
+    approx_gen.generate(approx_out_dir, approx_out_file, func_name)
+    approx_files.append(approx_out_dir + approx_out_file)
+  return approx_files
 
 def get_approx_errors(approx_files, func_name, testIn, testOut):
   #For each approximator, evaluate approximator quality on test set, save or show to console
@@ -143,9 +153,9 @@ if __name__ == '__main__':
   # (NOTE: This part can & should be split out from in/out pair generation for original function)
 
   #Split data into training & test sets
+  trainingPercent = 0.5
   inArray, outArray = load_func_in_out_data(results_dir)
   N = inArray.shape[0]
-  trainingPercent = 0.5
   Ntrain = math.floor(N * trainingPercent)
   Ntest = N - Ntrain
   trainIn = inArray[0:Ntrain,:]
@@ -154,17 +164,8 @@ if __name__ == '__main__':
   testOut = outArray[:,:,Ntrain:]
 
   #Then train & generate approximator outputs for different generators
-
   approx_out_dir = './approx/'
-  approx_files = []
-  for approx_config in approx_configs:
-    approx_name = approx_config.name
-    approx_out_file = approx_name + '.c'
-    approx_module = __import__(approx_config.module)
-    approx_gen_class = getattr(approx_module, approx_config.gen_class)
-    approx_gen = approx_gen_class(approx_config.params)
-    approx_gen.train(trainIn, trainOut)
-    approx_gen.generate(approx_out_dir, approx_out_file, func_name)
-    approx_files.append(approx_out_dir + approx_out_file)
+  approx_files = generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir)
 
+  #Approximator evaluation
   get_approx_errors(approx_files, func_name, testIn, testOut)
