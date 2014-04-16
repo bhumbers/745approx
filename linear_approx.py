@@ -38,7 +38,7 @@ class LinearApproxGenerator(ApproxGenerator):
         self.weights[r,c,:p] = regr.coef_
         self.weights[r,c,p] = regr.intercept_
 
-    print ('Train weights: \n', self.weights)
+    # print ('Train weights: \n', self.weights)
 
     # #Step 1: Find the min/max over each input dimension
     # minPerDim = inputs.min(axis=1)
@@ -52,6 +52,8 @@ class LinearApproxGenerator(ApproxGenerator):
     ioutils.mkdir_p(out_path)
 
     with open(out_path+out_file, 'w') as f:
+      f.write('#include <stdio.h>\n')
+
       #Write regression weights W as a static const array
       f.write('static const double W[] = {\n')
       (n_r, n_c, p_plus_1) = self.weights.shape
@@ -83,10 +85,13 @@ class LinearApproxGenerator(ApproxGenerator):
       f.write('    for (int c = 0; c < n_c; c++) {\n')
       f.write('      double val = 0;\n')
       f.write('      for (int i = 0; i < pPlusOne; i++) {\n')
-      f.write('       //Sort of a bad place for a conditional, but need to use const 1 for last term\n')
-      f.write('        double inVal = (i < pPlusOne) ? input[i] : 1;\n\n')
-      f.write('        val += inVal * W[r*(n_c*pPlusOne) + c*pPlusOne + i];\n')
-      f.write('      }\n;')
+      f.write('        //Sort of a bad place for a conditional, but need to use const 1 for last term\n')
+      f.write('        double inVal = (i < pPlusOne-1) ? input[i] : 1;\n\n')
+      f.write('        double w = W[r*(n_c*pPlusOne) + c*pPlusOne + i];\n')
+      # f.write('        printf("Input coeff: %f; output weight: %f \\n", inVal, w);\n')
+      f.write('        val += inVal * w;\n')
+      f.write('      }\n')
+      # f.write('      printf("Writing output val: %f\\n", val);\n')
       f.write('      output[r*n_c + c] = val;\n')
       f.write('    }\n')
       f.write('  }\n')
