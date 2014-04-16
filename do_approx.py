@@ -221,7 +221,7 @@ if __name__ == '__main__':
   trainingPercent = 0.5
   inArray, outArray = load_func_in_out_data(results_dir)
   N = inArray.shape[0]
-  Ntrain = math.floor(N * trainingPercent)
+  Ntrain = int(math.floor(N * trainingPercent))
   Ntest = N - Ntrain
   trainIn = inArray[0:Ntrain,:]
   trainOut = outArray[0:Ntrain,:,:]

@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
-from approx_generator import ApproxGenerator
-import ioutils
+import os
+
 import numpy as np
 from sklearn import linear_model
+
+from approx_generator import ApproxGenerator
+import ioutils
 
 class LinearApproxGenerator(ApproxGenerator):
   """
@@ -15,7 +18,6 @@ class LinearApproxGenerator(ApproxGenerator):
 
   def __init__(self, params):
     self.weights = []
-    pass
 
   def typename(sef):
     return "linear"
@@ -24,7 +26,8 @@ class LinearApproxGenerator(ApproxGenerator):
     p = inputs.shape[1]       #number of input features
     n_r = outputs.shape[1]    #size of output grid in rows
     n_c = outputs.shape[2]    #size of output grid in cols
-    #n = inputs.shape[0]       #number of observations (this should be the same as outputs.shape[2])
+
+    assert inputs.shape[0] == outputs.shape[0]
 
     self.weights = np.zeros([n_r,n_c,p+1])
 
@@ -46,54 +49,36 @@ class LinearApproxGenerator(ApproxGenerator):
     # rangeSizePerDim = maxPerDim - minPerDim
     # rangeStepPerDim = rangeSizePerDim / self.tableSizePerDim
 
-    pass
-
   def generate(self, out_path, out_file, out_func_name):
     ioutils.mkdir_p(out_path)
 
-    with open(out_path+out_file, 'w') as f:
-      f.write('#include <stdio.h>\n')
+    n_r, n_c, p_plus_1 = self.weights.shape
+
+    with open(os.path.join(out_path, out_file), 'w') as f:
+      print >>f, '#include <stdio.h>'
 
       #Write regression weights W as a static const array
-      f.write('static const double W[] = {\n')
-      (n_r, n_c, p_plus_1) = self.weights.shape
-      for r in xrange(n_r):
-        for c in xrange(n_c):
-          for i in xrange(p_plus_1):
-            f.write('%f, ' % self.weights[r,c,i])
-          f.write('\n')
-        f.write('\n')
-      f.seek(-4, 1)  #erase the extraneous ', ' (plus extra new lines) from the last entry in the array
-      f.write('\n};\n')
+      print >>f, 'static const double W[%d][%d][%d] = {' % self.weights.shape
+      print >>f, ',\n\n'.join(',\n'.join(', '.join('%f' % x for x in a) for a in b) for b in self.weights)
+      print >>f, '};'
 
       #Write misc. constants such as in & output size
-      f.write('\n');
-      f.write('static const int pPlusOne = %d;\n' % p_plus_1)
-      f.write('static const int n_r = %d;\n' % n_r)
-      f.write('static const int n_c = %d;\n' % n_c)
-      f.write('\n');
+      print >>f, 'static const int p = %d, n_r = %d, n_c = %d;' % (p_plus_1 - 1, n_r, n_c)
 
       #Standard function signature for our compiler
       #(TODO: move this to shared func?)
-      f.write('void ')
-      f.write(out_func_name)
-      f.write('(double* input, int inputLen, double* output, int outputRows, int outputCols)\n')
-      f.write('{\n')
+      print >>f, 'void %s(double input[p], int inputLen, double output[n_r][n_c], int outputRows, int outputCols){' % out_func_name
 
       #Write nested loop summation code for the function call
-      f.write('  for (int r = 0; r < n_r; r++) {\n')
-      f.write('    for (int c = 0; c < n_c; c++) {\n')
-      f.write('      double val = 0;\n')
-      f.write('      for (int i = 0; i < pPlusOne; i++) {\n')
-      f.write('        //Sort of a bad place for a conditional, but need to use const 1 for last term\n')
-      f.write('        double inVal = (i < pPlusOne-1) ? input[i] : 1;\n\n')
-      f.write('        double w = W[r*(n_c*pPlusOne) + c*pPlusOne + i];\n')
-      # f.write('        printf("Input coeff: %f; output weight: %f \\n", inVal, w);\n')
-      f.write('        val += inVal * w;\n')
-      f.write('      }\n')
-      # f.write('      printf("Writing output val: %f\\n", val);\n')
-      f.write('      output[r*n_c + c] = val;\n')
-      f.write('    }\n')
-      f.write('  }\n')
-
-      f.write('}')
+      print >>f, '''
+  for (int r = 0; r < n_r; r++) {
+    for (int c = 0; c < n_c; c++) {
+      double val = W[r][c][p];
+      for (int i = 0; i < p; i++) {
+        val += input[i] * W[r][c][i];
+      }
+      output[r][c] = val;
+    }
+  }
+}
+'''
