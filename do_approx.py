@@ -56,19 +56,22 @@ approx_configs = [
   ]
 
 
-#PLACEHOLDER: Generate some arbitrary inputs (one row per call)
-numInputTests = 10000   # number of distinct input instances to test
-inputLen = 5            # length of each input array
-numOutRows = 10         # Size in rows of grid output
-numOutCols = 10         # Size in cols of grid output
+#Generate some random sum-of-Gaussians inputs
+numGaussians = 3;
+numInputTests = 10000       # number of distinct input instances to test
+inputLen =   5*numGaussians # length of each input array
+numOutRows = 10             # Size in rows of grid output
+numOutCols = 10             # Size in cols of grid output
 funcInputs = np.zeros([numInputTests, inputLen])
-for i in range(numInputTests):
-  #Simple Gaussian centered in middle of grid (normalized [0,1] range)
-  funcInputs[i, 0] = rnd.random()  #mean
-  funcInputs[i, 1] = rnd.random()
-  funcInputs[i, 2] = 0.2  #variance
-  funcInputs[i, 3] = 0.4
-  funcInputs[i, 4] = 3    #amplitude
+for i in xrange(numInputTests):
+  #Lay out some Gaussians (normalized [0,1] range)
+  for j in xrange(numGaussians):
+    offset=5*j
+    funcInputs[i, offset+0] = rnd.random()  #mean
+    funcInputs[i, offset+1] = rnd.random()
+    funcInputs[i, offset+2] = 0.2             #variance
+    funcInputs[i, offset+3] = 0.4
+    funcInputs[i, offset+4] = 3              #amplitude
 funcOutput = np.zeros([numOutRows, numOutCols])
 
 if (saveFuncResults):
