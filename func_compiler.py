@@ -5,15 +5,20 @@ import tempfile
 ## takes a source file and a function name, and returns a callable corresponding
 ## to that function in the file
 def compile(filename, funcname):
+    return compile_files([filename], funcname)
+
+## takes a list of source files and a function name, and returns a callable corresponding
+## to that function in the file
+def compile_files(filenames, funcname):
     f = tempfile.NamedTemporaryFile(suffix='.so')
     ## TODO: allow for specification of different options
-    subprocess.check_call(['cc',
-                           filename,
-                           '-std=c99',
-                           '-shared',
-                           '-fPIC',
-                           '-o', f.name,
-                           ])
+    compile_cmd = ['cc']
+    compile_cmd.extend(filenames)
+    compile_cmd.extend(['-std=c99',
+                       '-shared',
+                       '-fPIC',
+                       '-o', f.name])
+    subprocess.check_call(compile_cmd)
     return ctypes.CDLL(f.name)[funcname]
 
 ## takes a source code string and a function name, and returns a callable
