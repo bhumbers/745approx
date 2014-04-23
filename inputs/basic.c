@@ -17,7 +17,3 @@ void basic_example(double* input, int inputLen, double* output, int outputRows, 
     }
   }
 }
-
-void blah() {
-  puts("Blah!");
-}

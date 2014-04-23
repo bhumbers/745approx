@@ -15,11 +15,15 @@ def compile_files(filenames, funcname):
     compile_cmd = ['cc']
     compile_cmd.extend(filenames)
     compile_cmd.extend(['-std=c99',
-                       '-shared',
-                       '-fPIC',
-                       '-o', f.name])
+                        '-shared',
+                        '-Llibraries/pyfann',
+                        '-Ilibraries/pyfann/include',
+                        '-ldoublefann',
+                        '-fPIC',
+                        '-o', f.name])
     subprocess.check_call(compile_cmd)
     return ctypes.CDLL(f.name)[funcname]
+
 
 ## takes a source code string and a function name, and returns a callable
 ## corresponding to that function in the code
