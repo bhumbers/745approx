@@ -2,10 +2,10 @@
 
 import glob
 import itertools
-import math
 import os
 import random
 import shutil
+import time
 import timeit
 
 from collections import namedtuple
@@ -18,15 +18,6 @@ from sklearn.metrics import mean_squared_error
 import func_compiler
 
 ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
-
-#Sets inputs, outputs, etc. for bound ctype function for our approximator signature
-def set_signature(func_handle):
-    func_handle.restype = None
-    func_handle.argtypes = [np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
-                            c_int,
-                            np.ctypeslib.ndpointer(c_double, flags="C_CONTIGUOUS"),
-                            c_int,
-                            c_int]
 
 def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
     rnd = random.Random()
@@ -63,7 +54,6 @@ def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols
     #Define the C function interface nicely
     #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
     orig_func = func_compiler.compile(func_source, func_name)
-    set_signature(orig_func)
 
     save_results = True
     func_output = np.zeros([out_rows, out_cols])
@@ -119,58 +109,29 @@ def generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_
         approx_files.append(join(approx_out_dir, approx_out_file))
     return approx_files
 
-def get_approx_errors(approx_files, func_name, testIn, testOut):
+def evaluate_approx(approx_files, func_name, test_in, test_out):
     #For each approximator, evaluate approximator quality on test set, save or show to console
-    approx_errors = []
-    approx_outputs_list = []
+    errors = []
+    outputs = []
+    times = []
+
+    n_r, n_c = test_out[0].shape
     for approx_file in approx_files:
-        approx_outputs = np.zeros(testOut.shape)
+        approx_outputs = np.zeros(test_out.shape)
         approx_func = func_compiler.compile(approx_file, func_name)
-        set_signature(approx_func)
 
-        approx_errors_by_test = np.zeros(len(testIn))
         #Find error of each approximation output compared to the original output
-        for inputIdx, inputRow in enumerate(testIn):
-            (out_rows, out_cols) = testOut[0,:,:].shape
-            approx_func(inputRow, inputRow.size, approx_outputs[inputIdx,:,:], out_rows, out_cols)
-            error = math.sqrt(mean_squared_error(testOut[inputIdx,:,:], approx_outputs[inputIdx,:,:])) #RMSE. We probably want to normalize this as well...
-            approx_errors_by_test[inputIdx] = error
+        t0 = time.time()
+        for input_row, output_row in zip(test_in, approx_outputs):
+            approx_func(input_row, input_row.size, output_row, n_r, n_c)
+        times.append(time.time() - t0)
+        errors.append(np.sqrt(mean_squared_error(test_out, approx_outputs)))
+        outputs.append(approx_outputs)
 
-        approx_errors.append(np.average(approx_errors_by_test))
-        approx_outputs_list.append(approx_outputs)
-
-    print 'RMSE BY APPROXIMATOR:'
-    for approxIdx, approx_error in enumerate(approx_errors):
-        approx_name = approx_files[approxIdx]
-        print '  %s: %f' % (approx_name, approx_error)
-    return approx_errors, approx_outputs_list
-
-def get_approx_timing(approx_files, func_name, func_inputs, out_rows, out_cols):
-    approx_timings = []
-    for approx_file in approx_files:
-        approx_timings.append(profile_function_speed(approx_file, func_name, func_inputs, out_rows, out_cols))
-
-    print 'TIME TO EXECUTE %d FUNCTION CALLS BY APPROXIMATOR:' % func_inputs.shape[0]
-    for approxIdx, approx_timing in enumerate(approx_timings):
-        approx_name = approx_files[approxIdx]
-        print '  %s: %f' % (approx_name, approx_timing)
-    return approx_timings
-
-    # print 'Profiled time to run %d inputs for source %s: %f' % (func_inputs.shape[0], func_source, runtime)
-
-def profile_function_speed(func_source, func_name, func_inputs, out_rows, out_cols):
-    func = func_compiler.compile(func_source, func_name)
-    set_signature(func)
-
-    def run_on_inputs(func, func_inputs, out_rows, out_cols):
-        func_output = np.zeros([out_rows, out_cols])
-        for inputIdx, inputRow in enumerate(func_inputs):
-            # func_output[:] = 0   #reset output before executing this call
-            func(inputRow, inputRow.size, func_output, out_rows, out_cols)
-
-    t = timeit.Timer(lambda: run_on_inputs(func, func_inputs, out_rows, out_cols))
-    runtime = t.timeit(number=1)
-    return runtime
+    print 'RESULTS BY APPROXIMATOR:'
+    for name, error, t in zip(approx_files, errors, times):
+        print '%20s: %6.4f %6.4f' % (name, error, t)
+    return errors, outputs
 
 if __name__ == '__main__':
     #Script to execute approximation function generation for a given C/C++ function (in a shared lib)
@@ -219,20 +180,19 @@ if __name__ == '__main__':
     trainingFrac = 0.5
     inArray, outArray = load_func_in_out_data(results_dir)
     N = inArray.shape[0]
-    Ntrain = int(math.floor(N * trainingFrac))
-    Ntest = N - Ntrain
+    Ntrain = int(N * trainingFrac)
     trainIn = inArray[:Ntrain]
     trainOut = outArray[:Ntrain]
     testIn = inArray[Ntrain:]
     testOut = outArray[Ntrain:]
 
+    print testIn.shape, testOut.shape
+
     #Then train & generate approximator outputs for different generators
     approx_out_dir = './approx/'
     approx_files = generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir)
 
-    #Approximator evaluation
-    print 'Errors eval...'
-    approx_errors, approx_outputs_list = get_approx_errors(approx_files, func_name, testIn, testOut)
-    print 'Performance eval...'
-    get_approx_timing(approx_files, func_name, testIn, out_rows, out_cols)
+    print 'Evaluating...'
+    evaluate_approx(approx_files, func_name, testIn, testOut)
+
     print 'DONE'

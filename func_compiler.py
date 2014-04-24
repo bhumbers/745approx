@@ -2,6 +2,18 @@ import ctypes
 import subprocess
 import tempfile
 
+import numpy as np
+
+## sets inputs, outputs, etc. for bound ctype function for our approximator signature
+def set_signature(func_handle):
+    func_handle.restype = None
+    func_handle.argtypes = [np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
+                            ctypes.c_int,
+                            np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
+                            ctypes.c_int,
+                            ctypes.c_int]
+    return func_handle
+
 ## takes a source file and a function name, and returns a callable corresponding
 ## to that function in the file
 def compile(filename, funcname):
@@ -22,8 +34,7 @@ def compile_files(filenames, funcname):
                         '-fPIC',
                         '-o', f.name])
     subprocess.check_call(compile_cmd)
-    return ctypes.CDLL(f.name)[funcname]
-
+    return set_signature(ctypes.CDLL(f.name)[funcname])
 
 ## takes a source code string and a function name, and returns a callable
 ## corresponding to that function in the code
