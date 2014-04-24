@@ -21,18 +21,23 @@ class NeuralNetApproxGenerator(ApproxGenerator):
         self.n_r = outputs.shape[1]    #size of output grid in rows
         self.n_c = outputs.shape[2]    #size of output grid in cols
 
+        self.out_min = outputs.min()
+        self.out_max = outputs.max()
+
+        outputs = (outputs - self.out_min) / (self.out_max - self.out_min)
+
         assert inputs.shape[0] == outputs.shape[0]
 
         nn = libfann.neural_net()
-        nn.create_standard_array((self.p, 100, self.n_r*self.n_c))
+        nn.create_standard_array((self.p, 100, 100, self.n_r*self.n_c))
         nn.set_learning_rate(.7)
         nn.set_activation_function_hidden(libfann.SIGMOID_SYMMETRIC)
-        nn.set_activation_function_output(libfann.SIGMOID_SYMMETRIC)
+        nn.set_activation_function_output(libfann.SIGMOID)
 
         data = libfann.training_data()
         data.set_train_data(inputs, outputs.reshape((-1, self.n_r*self.n_c)))
 
-        nn.train_on_data(data, 20, 4, .1)
+        nn.train_on_data(data, 500, 5, .005)
 
         nn.save('nn.net')
         nn.destroy()
@@ -43,14 +48,19 @@ class NeuralNetApproxGenerator(ApproxGenerator):
 #include <string.h>
 #include "doublefann.h"
 static const int p = %(p)d, n_r = %(n_r)d, n_c = %(n_c)d;
+static const double A = %(A)f, B = %(B)f;
 
 void %(func)s(double input[p], int inputLen, double output[n_r][n_c]){
   struct fann *nn = fann_create_from_file("nn.net");
   double *nn_out = fann_run(nn, input);
 
-  memcpy(output, nn_out, n_r * n_c * sizeof(double));
+  for(int i = 0; i < n_r; i++)
+    for(int j = 0; j < n_c; j++)
+      output[i][j] = nn_out[i*n_c+j] * B + A;
+  //memcpy(output, nn_out, n_r * n_c * sizeof(double));
 }
-''' % dict(func=out_func_name, p=self.p, n_r=self.n_r, n_c=self.n_c)
+''' % dict(func=out_func_name, p=self.p, n_r=self.n_r, n_c=self.n_c,
+           A=self.out_min, B=(self.out_max - self.out_min))
 
 if __name__ == '__main__':
     nn = libfann.neural_net()

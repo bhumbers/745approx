@@ -9,14 +9,15 @@ void sum_of_gaussians(double* input, int inputLen, double* output, int outputRow
   assert(inputLen % 5 == 0);
 
   int numGaussians = inputLen / 5;
-  for (int i = 0; i < numGaussians; i += 5) {
+  for (int i = 0; i < numGaussians; i++) {
+    double meanX =      input[5*i+0];
+    double meanY =      input[5*i+1];
+    double varX =       input[5*i+2];
+    double varY =       input[5*i+3];
+    double amplitude =  input[5*i+4];
+
     for (int row = 0; row < outputRows; row++) {
       for (int col = 0; col < outputCols; col++) {
-        double meanX =      input[i+0];
-        double meanY =      input[i+1];
-        double varX =       input[i+2];
-        double varY =       input[i+3];
-        double amplitude =  input[i+4];
         double x = col/(double)(outputCols);
         double y = row/(double)(outputRows);
         double val = amplitude * exp(-( (x - meanX)*(x - meanX)/(2*varX*varX) +

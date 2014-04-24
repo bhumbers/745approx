@@ -133,6 +133,28 @@ def evaluate_approx(approx_files, func_name, test_in, test_out):
         print '%20s: %6.4f %6.4f' % (name, error, t)
     return errors, outputs
 
+def plot_results(configs, outputs):
+    try:
+        import Image, math
+    except ImportError: return
+
+    N = min(100, outputs[0].shape[0], 100)
+    W = int(math.ceil(math.sqrt(N)))
+    H = (N + W-1) / W
+    D = 20
+
+    outputs = np.array([o[:N] for o in outputs])
+    a = outputs.min()
+    b = outputs.max()
+    outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
+
+    for o, c in zip(outputs, configs):
+        img = Image.new('L', (W*out_cols*D, H*out_cols*D))
+        for i, a in enumerate(o):
+            img.paste(Image.fromarray(a).resize((out_cols * D, out_rows * D)),
+                      (D * out_cols * (i % W), D * out_rows * (i / W)))
+        img.save('out_%s.png' % c.name)
+
 if __name__ == '__main__':
     #Script to execute approximation function generation for a given C/C++ function (in a shared lib)
 
@@ -144,7 +166,7 @@ if __name__ == '__main__':
 
 
     results_dir = './results'
-    num_inputs = 10000
+    num_inputs = 1000
 
     # Option #1: Sum-of-Gaussians
     func_name = 'sum_of_gaussians'
@@ -186,13 +208,13 @@ if __name__ == '__main__':
     testIn = inArray[Ntrain:]
     testOut = outArray[Ntrain:]
 
-    print testIn.shape, testOut.shape
-
     #Then train & generate approximator outputs for different generators
     approx_out_dir = './approx/'
     approx_files = generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir)
 
     print 'Evaluating...'
-    evaluate_approx(approx_files, func_name, testIn, testOut)
+    _, outputs = evaluate_approx(approx_files, func_name, testIn, testOut)
 
     print 'DONE'
+
+    plot_results(approx_configs, outputs)
