@@ -1,5 +1,14 @@
 #!/bin/bash
 
+if [ -z "$(which swig)" ]; then
+    echo "Must install SWIG!"
+    exit
+fi
+if [ -z "$(which cmake)" ]; then
+    echo "Must install cmake!"
+    exit
+fi
+
 mkdir -p libraries/tmp_fann
 
 cd libraries/tmp_fann
