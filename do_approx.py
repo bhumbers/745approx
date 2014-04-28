@@ -30,8 +30,8 @@ def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
             offset = 5*j
             func_inputs[i, offset+0] = rnd.random()  #mean
             func_inputs[i, offset+1] = rnd.random()
-            func_inputs[i, offset+2] = 0.2             #variance
-            func_inputs[i, offset+3] = 0.4
+            func_inputs[i, offset+2] = 0.1             #variance
+            func_inputs[i, offset+3] = 0.1
             func_inputs[i, offset+4] = 3              #amplitude
     return func_inputs
 
@@ -148,7 +148,7 @@ def evaluate_approx(approx_files, func_name, test_in, test_out):
         print '%20s: %6.4f %6.4f' % (name, error, t)
     return errors, outputs
 
-def plot_results(configs, outputs):
+def plot_results(configs, outputs, normalize_range):
     try:
         import Image, math
     except ImportError: return
@@ -159,9 +159,10 @@ def plot_results(configs, outputs):
     D = 20
 
     outputs = np.array([o[:N] for o in outputs])
-    a = outputs.min()
-    b = outputs.max()
-    # outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
+    if normalize_range:
+        a = outputs.min()
+        b = outputs.max()
+        outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
 
     for o, c in zip(outputs, configs):
         img = Image.new('L', (W*out_cols*D, H*out_cols*D))
@@ -185,7 +186,7 @@ if __name__ == '__main__':
     SOG_INPUT = 0
     MDP_INPUT = 1
     MED_INPUT = 2
-    input_type = MED_INPUT
+    input_type = SOG_INPUT
 
     if input_type == SOG_INPUT:
         # Option #1: Sum-of-Gaussians
@@ -253,4 +254,5 @@ if __name__ == '__main__':
 
     print 'DONE'
 
-    plot_results(approx_configs, outputs)
+    normalize_plot_range = (input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
+    plot_results(approx_configs, outputs, normalize_plot_range)
