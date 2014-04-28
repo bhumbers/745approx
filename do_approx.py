@@ -110,9 +110,10 @@ def load_func_in_out_data(results_dir):
         outArray[entryIdx,:,:] = outVals
     return inArray, outArray
 
-#Train & write C function approximators of named function & return a list of generated approximator source files
+#Train & write C function approximators of named function & return a list of
+# dict objs giving approx gen info, including generated approximator source file names under the key 'file'
 def generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir):
-    approx_files = []
+    approx_infos = []
     for approx_config in approx_configs:
         approx_module = __import__(approx_config.module)
         approx_gen_class = getattr(approx_module, approx_config.gen_class)
@@ -120,18 +121,28 @@ def generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_
         approx_gen.train(trainIn, trainOut)
 
         approx_out_file = approx_config.name + '.c'
+        t0 = time.time()
         approx_gen.generate(approx_out_dir, approx_out_file, func_name)
-        approx_files.append(join(approx_out_dir, approx_out_file))
-    return approx_files
+        t1 = time.time()
+        approx_info = {}
+        approx_info['file'] = join(approx_out_dir, approx_out_file)
+        approx_info['train_time'] = t1 - t0
 
-def evaluate_approx(approx_files, func_name, test_in, test_out):
+        approx_infos.append(approx_info)
+    return approx_infos
+
+def evaluate_approx(approx_infos, func_name, test_in, test_out):
     #For each approximator, evaluate approximator quality on test set, save or show to console
-    errors = []
+    approx_files = []
+    rms_errors = []
+    grad_errors = []
     outputs = []
-    times = []
+    train_times = []
+    run_times = []
 
     n_r, n_c = test_out[0].shape
-    for approx_file in approx_files:
+    for approx_info in approx_infos:
+        approx_file = approx_info['file']
         approx_outputs = np.zeros(test_out.shape)
         approx_func = func_compiler.compile(approx_file, func_name)
 
@@ -139,16 +150,20 @@ def evaluate_approx(approx_files, func_name, test_in, test_out):
         t0 = time.time()
         for input_row, output_row in zip(test_in, approx_outputs):
             approx_func(input_row, input_row.size, output_row, n_r, n_c)
-        times.append(time.time() - t0)
-        errors.append(np.sqrt(mean_squared_error(test_out, approx_outputs)))
+        run_times.append(time.time() - t0)
+        approx_files.append(approx_file)
+        rms_errors.append(np.sqrt(mean_squared_error(test_out, approx_outputs)))
+        grad_errors.append(np.sqrt(mean_squared_error(np.gradient(test_out), np.gradient(approx_outputs))))
+        train_times.append(approx_info['train_time'])
         outputs.append(approx_outputs)
 
     print 'RESULTS BY APPROXIMATOR:'
-    for name, error, t in zip(approx_files, errors, times):
-        print '%20s: %6.4f %6.4f' % (name, error, t)
-    return errors, outputs
+    print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime'
+    for name, rms_error, grad_error, train_time, run_time in zip(approx_files, rms_errors, grad_errors, train_times, run_times):
+        print '%20s: %6.4f %6.4f %6.4f %6.4f' % (name, rms_error, grad_error, train_time, run_time)
+    return rms_errors, outputs
 
-def plot_results(configs, outputs, normalize_range):
+def plot_results(configs, outputs, errors, normalize_range):
     try:
         import Image, math
     except ImportError: return
@@ -164,7 +179,7 @@ def plot_results(configs, outputs, normalize_range):
         b = outputs.max()
         outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
 
-    for o, c in zip(outputs, configs):
+    for o, err, c in zip(outputs, errors, configs):
         img = Image.new('L', (W*out_cols*D, H*out_cols*D))
         for i, a in enumerate(o):
             img.paste(Image.fromarray(a).resize((out_cols * D, out_rows * D)),
@@ -247,12 +262,12 @@ if __name__ == '__main__':
 
     #Then train & generate approximator outputs for different generators
     approx_out_dir = './approx/'
-    approx_files = generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir)
+    approx_infos = generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir)
 
     print 'Evaluating...'
-    _, outputs = evaluate_approx(approx_files, func_name, testIn, testOut)
+    errors, outputs = evaluate_approx(approx_infos, func_name, testIn, testOut)
 
     print 'DONE'
 
     normalize_plot_range = (input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
-    plot_results(approx_configs, outputs, normalize_plot_range)
+    plot_results(approx_configs, outputs, errors, normalize_plot_range)
