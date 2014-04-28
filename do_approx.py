@@ -50,6 +50,21 @@ def generate_mdp_inputs(num_inputs, num_rewards):
             func_inputs[i, offset+2] = rnd.random()  #reward
     return func_inputs
 
+#Generates a complete list of median filter problems where the filter kernel size varies between [0,0] and given [max_kernel_width, max_kernel_height]
+#Note that this is a lot less interesting than having an actual 2D image as input, but that's a really high-dim problem
+#that we're not going to mess with for this project.... the medianfilter function just uses a hardcoded test image.
+def generate_median_filter_inputs(max_kernel_width, max_kernel_height):
+    num_inputs = (max_kernel_width+1)*(max_kernel_height+1)
+    input_length =   4 # length of each input array
+    func_inputs = np.zeros([num_inputs, input_length])
+    i = 0
+    for kw in xrange(max_kernel_width+1):
+        for kh in xrange(max_kernel_height+1):
+            func_inputs[i, 0] = kw
+            func_inputs[i, 1] = kh
+            i += 1
+    return func_inputs
+
 def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir):
     #Define the C function interface nicely
     #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
@@ -146,7 +161,7 @@ def plot_results(configs, outputs):
     outputs = np.array([o[:N] for o in outputs])
     a = outputs.min()
     b = outputs.max()
-    outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
+    # outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
 
     for o, c in zip(outputs, configs):
         img = Image.new('L', (W*out_cols*D, H*out_cols*D))
@@ -166,17 +181,31 @@ if __name__ == '__main__':
 
 
     results_dir = './results'
-    num_inputs = 1000
 
-    # Option #1: Sum-of-Gaussians
-    func_name = 'sum_of_gaussians'
-    func_source = './inputs/gaussian.c'
-    input_gen = lambda: generate_sum_of_gaussians_inputs(num_inputs, 3)
+    SOG_INPUT = 0
+    MDP_INPUT = 1
+    MED_INPUT = 2
+    input_type = MED_INPUT
 
-    # # Option #2: MDP
-    # func_name = 'compute_mdp_values'  #"basic_example"
-    # func_source = './inputs/mdp.c' #"./inputs/basic.c"
-    # input_gen = lambda: generate_mdp_inputs(num_inputs, 1)
+    if input_type == SOG_INPUT:
+        # Option #1: Sum-of-Gaussians
+        num_inputs = 1000
+        func_name = 'sum_of_gaussians'
+        func_source = './inputs/gaussian.c'
+        input_gen = lambda: generate_sum_of_gaussians_inputs(num_inputs, 3)
+
+    elif input_type == MDP_INPUT:
+        # Option #2: MDP
+        num_inputs = 1000
+        func_name = 'compute_mdp_values'  #"basic_example"
+        func_source = './inputs/mdp.c' #"./inputs/basic.c"
+        input_gen = lambda: generate_mdp_inputs(num_inputs, 1)
+
+    elif input_type == MED_INPUT:
+        # Option #3: Median filter on an image
+        func_name = 'filter'
+        func_source = './inputs/medianfilter.c'
+        input_gen = lambda: generate_median_filter_inputs(5,5)
 
     #Set up approximator configs of interest
     approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source}),
@@ -190,8 +219,15 @@ if __name__ == '__main__':
 
     #ORIGNAL FUNCTION: Compute grid output for each input row
     print 'Computing original function results...'
-    out_rows = 10            # Size in rows of grid output
-    out_cols = 10             # Size in cols of grid output
+    # Set the grid output size
+    #We have to use a specific hardcoded size for the median filter domain (size of the test image in medianfilter.c)
+    if input_type == MED_INPUT:
+        out_rows = 100
+        out_cols = 100
+    #But modify the other problems as you see fit
+    else:
+        out_rows = 10
+        out_cols = 10
     compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir)
 
     #APPROXIMATORS: Train & generate C function to replace original function
