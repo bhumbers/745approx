@@ -12,6 +12,10 @@
 *.so
 *.o
 
+#Eval output
+*.png
+*.net
+
 # Packages
 *.egg
 *.egg-info
