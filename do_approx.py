@@ -272,7 +272,7 @@ if __name__ == '__main__':
     SOG_INPUT = 0
     MDP_INPUT = 1
     MED_INPUT = 2
-    input_type = MED_INPUT
+    input_type = SOG_INPUT
 
     if input_type == SOG_INPUT:
         # Option #1: Sum-of-Gaussians
