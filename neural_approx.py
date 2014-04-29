@@ -16,7 +16,7 @@ class NeuralNetApproxGenerator(ApproxGenerator):
     def typename(self):
         return "neural"
 
-    def train(self, inputs, outputs):
+    def train(self, inputs, outputs, params):
         self.p = inputs.shape[1]       #number of input features
         self.n_r = outputs.shape[1]    #size of output grid in rows
         self.n_c = outputs.shape[2]    #size of output grid in cols

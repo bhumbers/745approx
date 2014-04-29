@@ -15,12 +15,14 @@ from os.path import join
 
 import numpy as np
 from sklearn.metrics import mean_squared_error
+from sklearn.cross_validation import KFold
 from pylab import imread, mean
 import math
 
 import func_compiler
 
 ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
+EvalResult = namedtuple('EvalResult', ['name', 'hyperp', 'rms_error', 'grad_error', 'train_time', 'run_time', 'calls'])
 
 def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
     rnd = random.Random()
@@ -122,24 +124,27 @@ def load_func_in_out_data(results_dir):
 
 #Train & write C function approximators of named function & return a list of
 # dict objs giving approx gen info, including generated approximator source file names under the key 'file'
-def generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir):
-    approx_infos = []
-    for approx_config in approx_configs:
-        approx_module = __import__(approx_config.module)
-        approx_gen_class = getattr(approx_module, approx_config.gen_class)
-        approx_gen = approx_gen_class(approx_config.params)
-        approx_gen.train(trainIn, trainOut)
+def generate_approximators(approx_config, func_name, trainIn, trainOut, approx_out_dir):
+    approx_module = __import__(approx_config.module)
+    approx_gen_class = getattr(approx_module, approx_config.gen_class)
+    approx_gen = approx_gen_class(approx_config.params)
+    
+    approx_info = {}
+    approx_info['files'] = []
+    approx_info['hyperps'] = []
+    approx_info['train_times'] = []
+    for index, p in enumerate(approx_config.params['hyperp']):
+        approx_gen.train(trainIn, trainOut, p)
 
-        approx_out_file = approx_config.name + '.c'
+        approx_out_file = approx_config.name + str(index) + '.c'
         t0 = time.time()
         approx_gen.generate(approx_out_dir, approx_out_file, func_name)
         t1 = time.time()
-        approx_info = {}
-        approx_info['file'] = join(approx_out_dir, approx_out_file)
-        approx_info['train_time'] = t1 - t0
+        approx_info['files'].append(join(approx_out_dir, approx_out_file))
+        approx_info['hyperps'].append(p)
+        approx_info['train_times'].append(t1 - t0)
 
-        approx_infos.append(approx_info)
-    return approx_infos
+    return approx_info
 
 
 def lli_compile(func_source, func_name, inputs, in_size, out_r, out_c):
@@ -189,52 +194,54 @@ def get_approx_num_calls():
 
 
 
-def evaluate_approx(approx_infos, func_name, test_in, test_out):
+def evaluate_approx(approx_info, func_name, test_in, test_out):
     #For each approximator, evaluate approximator quality on test set, save or show to console
-    approx_files = []
-    rms_errors = []
-    grad_errors = []
-    outputs = []
-    train_times = []
-    run_times = []
-    calls = []
 
     n_r, n_c = test_out[0].shape
-    for approx_info in approx_infos:
-        approx_file = approx_info['file']
+    best_rmse = np.inf
+    best_index = 0
+
+    for index, p in enumerate(approx_info['hyperps']):
+        approx_file = approx_info['files'][index]
         approx_outputs = np.zeros(test_out.shape)
         approx_func = func_compiler.compile(approx_file, func_name)
 
-        #Find error of each approximation output compared to the original output
-        t0 = time.time()
         for input_row, output_row in zip(test_in, approx_outputs):
             approx_func(input_row, input_row.size, output_row, n_r, n_c)
-        run_times.append(time.time() - t0)
-        _, test_grad_rows, test_grad_cols = np.gradient(test_out)
-        _, approx_grad_rows, approx_grad_cols = np.gradient(approx_outputs)
-        test_grad = np.array([test_grad_rows, test_grad_cols])
-        approx_grad = np.array([approx_grad_rows, approx_grad_cols])
-        approx_files.append(approx_file)
-        rms_errors.append(np.sqrt(mean_squared_error(test_out, approx_outputs)))
-        grad_errors.append(np.sqrt(mean_squared_error(test_grad, approx_grad)))
-        train_times.append(approx_info['train_time'])
-        outputs.append(approx_outputs)
+        rmse = np.sqrt(mean_squared_error(test_out, approx_outputs))
+        if (rmse < best_rmse):
+            best_rmse = rmse
+            best_index = index
 
-        num_inputs = test_in.shape[0]
-        k = np.ceil(num_inputs / 20)
-        samples = random.sample(xrange(num_inputs), int(k))
-        sample_in = test_in[samples]
-        lli_compile(approx_file, func_name, sample_in, np.size(test_in[0]), n_r, n_c)
-        calls.append(get_approx_num_calls())
+    best_approx_file = approx_info['files'][best_index]
+
+    #Collect metrics on best approximator
+    #Find error of each approximation output compared to the original output
+    t0 = time.time()
+    best_approx_func = func_compiler.compile(best_approx_file, func_name)
+    for input_row, output_row in zip(test_in, approx_outputs):
+        best_approx_func(input_row, input_row.size, output_row, n_r, n_c)
+    run_time = time.time() - t0
+    _, test_grad_rows, test_grad_cols = np.gradient(test_out)
+    _, approx_grad_rows, approx_grad_cols = np.gradient(approx_outputs)
+    test_grad = np.array([test_grad_rows, test_grad_cols])
+    approx_grad = np.array([approx_grad_rows, approx_grad_cols])
+    rms_error = np.sqrt(mean_squared_error(test_out, approx_outputs))
+    grad_error = np.sqrt(mean_squared_error(test_grad, approx_grad))
+    train_time = approx_info['train_times'][best_index]
+    outputs = approx_outputs
+
+    num_inputs = test_in.shape[0]
+    k = np.ceil(num_inputs / 20)
+    samples = random.sample(xrange(num_inputs), int(k))
+    sample_in = test_in[samples]
+    lli_compile(best_approx_file, func_name, sample_in, np.size(test_in[0]), n_r, n_c)
+    calls = get_approx_num_calls()
+
+    return EvalResult(best_approx_file, approx_info['hyperps'][best_index], rms_error, grad_error, train_time, run_time, calls), outputs
 
 
-    print 'RESULTS BY APPROXIMATOR:'
-    print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime, Calls'
-    for name, rms_error, grad_error, train_time, run_time, call in zip(approx_files, rms_errors, grad_errors, train_times, run_times, calls):
-        print '%20s: %6.4f %6.4f %6.4f %6.4f %d' % (name, rms_error, grad_error, train_time, run_time, int(call))
-    return rms_errors, outputs
-
-def plot_results(configs, outputs, errors, normalize_range):
+def plot_results(configs, outputs, normalize_range):
     try:
         import Image, math
     except ImportError: return
@@ -250,7 +257,7 @@ def plot_results(configs, outputs, errors, normalize_range):
         b = outputs.max()
         outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
 
-    for o, err, c in zip(outputs, errors, configs):
+    for o, c in zip(outputs, configs):
         img = Image.new('L', (W*out_cols*D, H*out_cols*D))
         for i, a in enumerate(o):
             img.paste(Image.fromarray(a).resize((out_cols * D, out_rows * D)),
@@ -298,11 +305,6 @@ if __name__ == '__main__':
         img_chunk_h = 30
         input_gen = lambda: generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img_chunk_h)
 
-    #Set up approximator configs of interest
-    approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source}),
-                      ApproxConfig('linear_approx', 'LinearApproxGenerator', 'linear', {}),
-                      ApproxConfig('neural_approx', 'NeuralNetApproxGenerator', 'neural', {}),
-                      ]
 
     #Generate some random sum-of-Gaussians inputs
     print 'Input generation...'
@@ -335,14 +337,33 @@ if __name__ == '__main__':
     testIn = inArray[Ntrain:]
     testOut = outArray[Ntrain:]
 
-    #Then train & generate approximator outputs for different generators
-    approx_out_dir = './approx/'
-    approx_infos = generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir)
+    #Generate list of hyperparameter tuples to be evaluated
+    linear_hyperparams = [1]
+    neural_hyperparams = [1] # Danny TODO
+    svm_hyperparams = [1] # Danny TODO
 
-    print 'Evaluating...'
-    errors, outputs = evaluate_approx(approx_infos, func_name, testIn, testOut)
+    #Set up approximator configs of interest
+    approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source, 'hyperp': [1]}),
+                      ApproxConfig('linear_approx', 'LinearApproxGenerator', 'linear', {'hyperp': linear_hyperparams}),
+                      ApproxConfig('neural_approx', 'NeuralNetApproxGenerator', 'neural', {'hyperp': neural_hyperparams}),
+                     ]
+
+    #Then train & generate approximator outputs for different generators
+    eval_results = []
+    outputs = []
+    approx_out_dir = './approx/'
+    for config in approx_configs:
+        approx_info = generate_approximators(config, func_name, trainIn, trainOut, approx_out_dir)
+        eval_result, output = evaluate_approx(approx_info, func_name, testIn, testOut)
+        eval_results.append(eval_result)
+        outputs.append(output)
+
+    print 'RESULTS BY APPROXIMATOR:'
+    print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime, Calls'
+    for result in eval_results:
+        print '%20s: %6.4f %6.4f %6.4f %6.4f %d' % (result.name, result.rms_error, result.grad_error, result.train_time, result.run_time, int(result.calls))
 
     print 'DONE'
 
     normalize_plot_range = True#(input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
-    plot_results(approx_configs, outputs, errors, normalize_plot_range)
+    plot_results(approx_configs, outputs, normalize_plot_range)

@@ -20,7 +20,7 @@ class DummyApproxGenerator(ApproxGenerator):
     def typename(self):
         return "dummy"
 
-    def train(self, inputs, outputs):
+    def train(self, inputs, outputs, params):
         pass
 
     def generate(self, out_path, out_file, out_func_name):

@@ -22,7 +22,7 @@ class LinearApproxGenerator(ApproxGenerator):
     def typename(self):
         return "linear"
 
-    def train(self, inputs, outputs):
+    def train(self, inputs, outputs, params):
         p = inputs.shape[1]       #number of input features
         n_r = outputs.shape[1]    #size of output grid in rows
         n_c = outputs.shape[2]    #size of output grid in cols
