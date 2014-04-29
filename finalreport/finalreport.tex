@@ -13,7 +13,7 @@
 
 Approximate computing is a method of computation that sacrifices accuracy for computation time and energy. For certain problems, a large degree of precision may not be necessary, and the savings gained in battery life or power costs may be worth more than the accuracy lost. In particular, we are inspired by the RoboCup code, where speed in decision-making trades off with the optimality of the final decision. Approximate compilation is a promising way of implementing approximate computation that can be done on current machines.
 
-In this project, we take several C functions and
+In this project, we take several C functions and compile them into various approximators (also C functions, with the same function signature). We then analyze them to determine the speedup and how well they approximate the original.
 
 \section{Related Work}
 In tandem with the renewed focus on paralell computing, interest in general purpose approximate computing increased recently in response to the decelerating efficiency gains for traditional scalar microprocessors. Techniques in approximate compilation automatically produce inexact yet more efficient versions of programmer-specified ``approximable'' code regions or data structures. An approximating compiler is thus responsible for encapsulating the low-level implementation of approximated code derived, typically, from high level source. The programmer's input over how the approximation is implemented may only be binary (eg: annotating some functions as ``approximable'', as in \cite{Esmaeilzadeh12}), or they may be given finer-grained control over the tradeoff between accuracy and speedup of the approximation, as in the quality programmable machine instructions from \cite{Venkataramani13}.
@@ -26,7 +26,61 @@ An alterative to marking specific code sections or functions as ``approximable''
 
 \section{Method}
 
+We've implemented a compilation framework in python. Approximators derived from a base class specify how to generate a C file with an approximate version of the original function. In general, these approximators are machine learning models whose parameters are learned by training on various input/output examples. The parameter values that minimize error are incorporated into the approximate C code. That approximation code is then run from python and compared with the original.
+
+\subsection{Approximators}
+
+\subsubsection{Linear regression}
+
+This approximates the original function by defining the function output to be a linear combination of the features of the input. The approximation is learned using scikit-learn's linear model package. The weights and the simple code that evaluates the linear function using those weights are what is written to file.
+
+\subsubsection{Neural networks}
+
+Similar to \cite{Esmaeilzadeh12}, we used a neural network to approximate functions. They were learned using a python implementation of FANN. FANN was used in the implementation of the approximation C code as well. % Danny: add any other notes here about what kind neural network we learned or whatnot
+
+\subsubsection{SVM}
+
+%TBA by Danny.
+
+\section{Evaluation}
+
+\subsection{Input Functions}
+
+Though this project was inspired by RoboCup, which involves evaluating the utility of passing the ball to certain locations on the field given the current location of robots, we ended up not having the time to try our approximators on RoboCup code. Instead, we evaluated several other problems of a similar nature (they all involve taking in a vector of features that describes properties of a 2-D grid and then outputting a 2-D grid of values).
+
+\begin{itemize}
+\item \textbf{Sum of Gaussians:} The output of the original function is equivalent to the sum of 1, 2, or 10 Gaussians placed randomly on the input grid.
+
+\item \textbf{MDP:} The original function involves solving a Markov decision process type problem where 1, 2, or 10 reward states have been assigned to squares of the input grid. Instead of calculating the value function using standard AI algorithms, we replace it with approximators.
+
+\item \textbf{Median filter:} The original function is a nonlinear filter applied to the pixels of an image.
+\end{itemize}
+
+\subsection{Metrics}
+
+\subsubsection{Error Metrics}
+We use these metrics to assess how close/good our approximations are.
+
+\begin{itemize}
+\item Root mean squared error (RMSE)
+\item Preservation of max and min locations
+\item Qualitative (see figures)
+\end{itemize}
+
+\subsubsection{Performance Metrics}
+\begin{itemize}
+\item Training time - how long it took to train approximator
+\item Execution time - time spent running function on inputs
+\item Instruction read counts - number of instructions executed (collected using valgrind's callgrind tool)
+\end{itemize}
+
 \section{Results}
+
+% Tables! Graphs! Pictures!
+
+\section{Discussion}
+
+\section{Project Notes}
 
 \bibliographystyle{ieeetr}
 \bibliography{sources}
