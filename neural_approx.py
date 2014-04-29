@@ -50,7 +50,7 @@ class NeuralNetApproxGenerator(ApproxGenerator):
 static const int p = %(p)d, n_r = %(n_r)d, n_c = %(n_c)d;
 static const double A = %(A)f, B = %(B)f;
 
-void %(func)s(double input[p], int inputLen, double output[n_r][n_c]){
+void %(func)s(double input[p], int inputLen, double output[n_r][n_c], int n_r, int n_c){
   struct fann *nn = fann_create_from_file("nn.net");
   double *nn_out = fann_run(nn, input);
 

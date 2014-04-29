@@ -139,29 +139,44 @@ def lli_compile(func_source, func_name, inputs, in_size, out_r, out_c):
         f.write('int main() {\n')
         f.write('    double inputs[%d][%d] = {\n' 
                 % (inputs.shape[0], inputs.shape[1]) )
-        for idx, input_row in enumerate(inputs):
+        for input_row in inputs:
             f.write('        {')
             for v in input_row:
                 f.write('%f, ' % v)
             f.write('},\n')
         f.write('    };\n')
-        f.write('    double output[%d];\n\n' % (out_r*out_c) )
+        f.write('    double output[%d][%d];\n\n' % (out_r, out_c) )
         f.write('    for (int i = 0; i < %d; i++) {\n' % inputs.shape[0])
-        f.write('        %s(inputs[i], %d, output, %d, %d);\n'
+        f.write('        %s(inputs[i], %d, (void*)output, %d, %d);\n'
                 % (func_name, in_size, out_r, out_c) )
         f.write("    }\n");
         f.write("}\n");
 
 
 def get_approx_num_calls():
-    num_llvm_calls = 0
+    num_callgrind_calls = 0
 
+    args = '-Ilibraries/pyfann/include temp_main.c -Llibraries/pyfann -std=c99 -ldoublefann -lm'
+    subprocess.check_call(['gcc'] + args.split())
+
+    print("Running valgrind (may take a while)...")
+    args = '--tool=callgrind --log-file=out.txt ./a.out'
+    callgrind_output = subprocess.check_output(['valgrind'] + args.split())
+
+    # open output and parse to get calls
+    with open('out.txt', 'r') as f:
+        for line in f:
+            if (line.find('Collected') > -1):
+                line_tokens = line.split()
+                num_callgrind_calls = line_tokens[3]
+
+    ## Old code, for lli/llvm
     #args = '-emit-llvm -O3 -o out -c'.split() + ['temp_main.c']
     #subprocess.check_call(['clang'] + args)
     #args = '-stats -force-interpreter out'
     #head_output = subprocess.check_output(['lli'] + args.split())
     #print(head_output)
-    return num_llvm_calls
+    return num_callgrind_calls
 
 
 
@@ -192,14 +207,18 @@ def evaluate_approx(approx_infos, func_name, test_in, test_out):
         train_times.append(approx_info['train_time'])
         outputs.append(approx_outputs)
 
-        lli_compile(approx_file, func_name, test_in, np.size(test_in[0]), n_r, n_c)
+        num_inputs = test_in.shape[0]
+        k = np.ceil(num_inputs / 20)
+        samples = random.sample(xrange(num_inputs), int(k))
+        sample_in = test_in[samples]
+        lli_compile(approx_file, func_name, sample_in, np.size(test_in[0]), n_r, n_c)
         calls.append(get_approx_num_calls())
 
 
     print 'RESULTS BY APPROXIMATOR:'
-    print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime'
-    for name, rms_error, grad_error, train_time, run_time in zip(approx_files, rms_errors, grad_errors, train_times, run_times):
-        print '%20s: %6.4f %6.4f %6.4f %6.4f' % (name, rms_error, grad_error, train_time, run_time)
+    print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime, Calls'
+    for name, rms_error, grad_error, train_time, run_time, call in zip(approx_files, rms_errors, grad_errors, train_times, run_times, calls):
+        print '%20s: %6.4f %6.4f %6.4f %6.4f %d' % (name, rms_error, grad_error, train_time, run_time, int(call))
     return rms_errors, outputs
 
 def plot_results(configs, outputs, errors, normalize_range):
