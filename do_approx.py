@@ -24,6 +24,11 @@ import func_compiler
 ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
 EvalResult = namedtuple('EvalResult', ['name', 'hyperp', 'rms_error', 'grad_error', 'train_time', 'run_time', 'calls'])
 
+def generate_linear_inputs(num_inputs):
+    rnd = random.Random()
+    rnd.seed(42)
+    return np.random.random((num_inputs, 2))
+
 def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
     rnd = random.Random()
     rnd.seed(42)
@@ -78,8 +83,6 @@ def generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img
     return func_inputs
 
 def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir):
-    #Define the C function interface nicely
-    #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
     orig_func = func_compiler.compile(func_source, func_name)
 
     save_results = True
@@ -134,12 +137,12 @@ def generate_approximators(approx_config, func_name, trainIn, trainOut, approx_o
     approx_info['hyperps'] = []
     approx_info['train_times'] = []
     for index, p in enumerate(approx_config.params['hyperp']):
+        t0 = time.time()
         approx_gen.train(trainIn, trainOut, p)
+        t1 = time.time()
 
         approx_out_file = approx_config.name + str(index) + '.c'
-        t0 = time.time()
         approx_gen.generate(approx_out_dir, approx_out_file, func_name)
-        t1 = time.time()
         approx_info['files'].append(join(approx_out_dir, approx_out_file))
         approx_info['hyperps'].append(p)
         approx_info['train_times'].append(t1 - t0)
@@ -190,6 +193,7 @@ def get_approx_num_calls():
     #args = '-stats -force-interpreter out'
     #head_output = subprocess.check_output(['lli'] + args.split())
     #print(head_output)
+    print("DEBUG: Bottom of get_approx_num_calls()")
     return num_callgrind_calls
 
 
@@ -255,7 +259,7 @@ def plot_results(configs, outputs, normalize_range):
     if normalize_range:
         a = outputs.min()
         b = outputs.max()
-        outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
+        outputs = (.5 + 254 * (outputs - a) / (b - a)).astype(np.uint8)
 
     for o, c in zip(outputs, configs):
         img = Image.new('L', (W*out_cols*D, H*out_cols*D))
@@ -279,6 +283,7 @@ if __name__ == '__main__':
     SOG_INPUT = 0
     MDP_INPUT = 1
     MED_INPUT = 2
+    LIN_INPUT = 3
     input_type = SOG_INPUT
 
     if input_type == SOG_INPUT:
@@ -305,6 +310,11 @@ if __name__ == '__main__':
         img_chunk_h = 30
         input_gen = lambda: generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img_chunk_h)
 
+    elif input_type == LIN_INPUT:
+        num_inputs = 500
+        func_name = 'linear'
+        func_source = './inputs/linear.c'
+        input_gen = lambda: generate_linear_inputs(num_inputs)
 
     #Generate some random sum-of-Gaussians inputs
     print 'Input generation...'
@@ -322,14 +332,14 @@ if __name__ == '__main__':
         out_rows = 10
         out_cols = 10
     compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir)
+    inArray, outArray = load_func_in_out_data(results_dir)
 
     #APPROXIMATORS: Train & generate C function to replace original function
     # (NOTE: This part can & should be split out from in/out pair generation for original function)
 
     print 'Generator training...'
     #Split data into training & test sets
-    trainingFrac = 0.5
-    inArray, outArray = load_func_in_out_data(results_dir)
+    trainingFrac = 0.9
     N = inArray.shape[0]
     Ntrain = int(N * trainingFrac)
     trainIn = inArray[:Ntrain]
@@ -346,7 +356,8 @@ if __name__ == '__main__':
     approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source, 'hyperp': [1]}),
                       ApproxConfig('linear_approx', 'LinearApproxGenerator', 'linear', {'hyperp': linear_hyperparams}),
                       ApproxConfig('neural_approx', 'NeuralNetApproxGenerator', 'neural', {'hyperp': neural_hyperparams}),
-                     ]
+                      ApproxConfig('svm_approx', 'SVMApproxGenerator', 'svm', {'hyperp': svm_hyperparams}),
+                      ]
 
     #Then train & generate approximator outputs for different generators
     eval_results = []
@@ -359,9 +370,9 @@ if __name__ == '__main__':
         outputs.append(output)
 
     print 'RESULTS BY APPROXIMATOR:'
-    print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime, Calls'
+    print '%20s: %10s %10s %10s %10s %10s' % ('Name', 'RMSE', 'grad RMSE', 'train time', 'run time', 'calls')
     for result in eval_results:
-        print '%20s: %6.4f %6.4f %6.4f %6.4f %d' % (result.name, result.rms_error, result.grad_error, result.train_time, result.run_time, int(result.calls))
+        print '%20s: %10.4f %10.4f %10.4f %10.4f %10d' % (result.name, result.rms_error, result.grad_error, result.train_time, result.run_time, int(result.calls))
 
     print 'DONE'
 

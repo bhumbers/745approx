@@ -4,7 +4,8 @@ import tempfile
 
 import numpy as np
 
-## sets inputs, outputs, etc. for bound ctype function for our approximator signature
+## define the C function interface nicely
+## source: http://stackoverflow.com/questions/5862915/
 def set_signature(func_handle):
     func_handle.restype = None
     func_handle.argtypes = [np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
@@ -31,6 +32,9 @@ def compile_files(filenames, funcname):
                         '-Llibraries/pyfann',
                         '-Ilibraries/pyfann/include',
                         '-ldoublefann',
+                        '-Llibraries/libsvm',
+                        '-Ilibraries/libsvm',
+                        '-lsvm',
                         '-fPIC',
                         '-o', f.name])
     subprocess.check_call(compile_cmd)
