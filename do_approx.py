@@ -45,13 +45,13 @@ def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
             func_inputs[i, offset+4] = 3              #amplitude
     return func_inputs
 
-def generate_mdp_inputs(num_inputs, num_rewards):
+def generate_mdp_inputs(num_inputs, num_rewards, discount_factor):
     rnd = random.Random()
     rnd.seed(42)
     input_length =   1 + 3*num_rewards # length of each input array
     func_inputs = np.zeros([num_inputs, input_length])
     for i in xrange(num_inputs):
-        func_inputs[i, 0] = 0.99 #discount factor for MDP
+        func_inputs[i, 0] = discount_factor
         #Lay out some rewards
         for j in xrange(num_rewards):
             offset = 1 + 3*j
@@ -131,7 +131,7 @@ def generate_approximators(approx_config, func_name, trainIn, trainOut, approx_o
     approx_module = __import__(approx_config.module)
     approx_gen_class = getattr(approx_module, approx_config.gen_class)
     approx_gen = approx_gen_class(approx_config.params)
-    
+
     approx_info = {}
     approx_info['files'] = []
     approx_info['hyperps'] = []
@@ -174,11 +174,16 @@ def get_approx_num_calls():
     num_callgrind_calls = 0
 
     args = '-Ilibraries/pyfann/include temp_main.c -Llibraries/pyfann -std=c99 -ldoublefann -lm'
+    args = (' -std=c99'
+            ' -Ilibraries/pyfann/include -Llibraries/pyfann'
+            ' -Ilibraries/libsvm -Llibraries/libsvm'
+            ' temp_main.c -ldoublefann -lm -lsvm')
     subprocess.check_call(['gcc'] + args.split())
 
     print("Running valgrind (may take a while)...")
     args = '--tool=callgrind --log-file=out.txt ./a.out'
-    callgrind_output = subprocess.check_output(['valgrind'] + args.split())
+    callgrind_output = subprocess.check_output(['valgrind'] + args.split(),
+                        env={'LD_LIBRARY_PATH': 'libraries/pyfann:libraries/libsvm'})
 
     # open output and parse to get calls
     with open('out.txt', 'r') as f:
@@ -284,7 +289,7 @@ if __name__ == '__main__':
     MDP_INPUT = 1
     MED_INPUT = 2
     LIN_INPUT = 3
-    input_type = SOG_INPUT
+    input_type = MDP_INPUT
 
     if input_type == SOG_INPUT:
         # Option #1: Sum-of-Gaussians
@@ -295,10 +300,12 @@ if __name__ == '__main__':
 
     elif input_type == MDP_INPUT:
         # Option #2: MDP
-        num_inputs = 1000
+        num_inputs = 40
         func_name = 'compute_mdp_values'  #"basic_example"
         func_source = './inputs/mdp.c' #"./inputs/basic.c"
-        input_gen = lambda: generate_mdp_inputs(num_inputs, 1)
+        num_rewards = 1
+        discount_factor = 0.7  #reward discount factor for MDP
+        input_gen = lambda: generate_mdp_inputs(num_inputs, num_rewards, discount_factor)
 
     elif input_type == MED_INPUT:
         # Option #3: Median filter on an image
