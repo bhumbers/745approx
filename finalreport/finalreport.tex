@@ -3,13 +3,21 @@
 \usepackage{fullpage}
 
 \begin{document}
+
+\title{Approximating Functions for Grid Domains}
+\author{Danny Zhu (dannyz) \and Yuzi Nakamura (ynakamur) \and Ben Humberston (bhumbers)}
+
+\maketitle
+
 \section{Introduction}
 
 Approximate computing is a method of computation that sacrifices accuracy for computation time and energy. For certain problems, a large degree of precision may not be necessary, and the savings gained in battery life or power costs may be worth more than the accuracy lost. In particular, we are inspired by the RoboCup code, where speed in decision-making trades off with the optimality of the final decision. Approximate compilation is a promising way of implementing approximate computation that can be done on current machines.
 
-In this project, we take several C functions and 
+In this project, we take several C functions and
 
 \section{Related Work}
+Similar to renewed focus on paralell computing, interest in general purpose approximate computing has grown in recent years in response to the decelerating efficiency gains for traditional scalar microprocessors. Tecniques in approximate compilation allow a compiler to automatically produce approximating versions of programmer-specified ``approximable'' code regions or data structures. The programmer's input over how the approximation is made may be coarsely binary (approximable or precise), or they may be given control over the tradeoff between accuracy and speedup of the approximation.
+
 \cite{Agarwal09} \cite{Sampson11} \cite{Esmaeilzadeh12} \cite{Venkataramani13} \cite{Amant14}
 
 \section{Method}
@@ -18,6 +26,5 @@ In this project, we take several C functions and
 
 \bibliographystyle{ieeetr}
 \bibliography{sources}
-
 
 \end{document}
