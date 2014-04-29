@@ -54,3 +54,6 @@ nosetests.xml
 *.blg
 *.fdb_latexmk
 *.pdf
+
+temp_main.c
+*.out
