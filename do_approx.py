@@ -15,6 +15,8 @@ from os.path import join
 
 import numpy as np
 from sklearn.metrics import mean_squared_error
+from pylab import imread, mean
+import math
 
 import func_compiler
 
@@ -51,18 +53,25 @@ def generate_mdp_inputs(num_inputs, num_rewards):
             func_inputs[i, offset+2] = rnd.random()  #reward
     return func_inputs
 
-#Generates a complete list of median filter problems where the filter kernel size varies between [0,0] and given [max_kernel_width, max_kernel_height]
-#Note that this is a lot less interesting than having an actual 2D image as input, but that's a really high-dim problem
-#that we're not going to mess with for this project.... the medianfilter function just uses a hardcoded test image.
-def generate_median_filter_inputs(max_kernel_width, max_kernel_height):
-    num_inputs = (max_kernel_width+1)*(max_kernel_height+1)
-    input_length =   4 # length of each input array
+def generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img_chunk_h):
+    img = mean(imread('./imgs/edison_noise50.png'),2)
+    (img_h, img_w) = img.shape
+
+    #Size of little chunks that we'll cut the image into
+    img_chunk_full_w = img_chunk_w + 2*kernel_half_w
+    img_chunk_full_h = img_chunk_h + 2*kernel_half_h
+    num_inputs = int(math.floor(img_w / img_chunk_w) * math.floor(img_h / img_chunk_h))
+    input_length = 2 + (img_chunk_full_w*img_chunk_full_h)
     func_inputs = np.zeros([num_inputs, input_length])
     i = 0
-    for kw in xrange(max_kernel_width+1):
-        for kh in xrange(max_kernel_height+1):
-            func_inputs[i, 0] = kw
-            func_inputs[i, 1] = kh
+    #Break the image into overlapping chunks to be consumed by the filter
+    #Overlapping because a (kernel_half_w, kernerl_half_h) border region must be included per chunk as input to the filter
+    for y in xrange(kernel_half_h, img_h - img_chunk_h - kernel_half_h, img_chunk_h):
+        for x in xrange(kernel_half_w, img_w - img_chunk_w - kernel_half_w, img_chunk_w):
+            img_chunk = img[y-kernel_half_h:(y+img_chunk_h+kernel_half_h), x-kernel_half_w:(x+img_chunk_w+kernel_half_w)]
+            func_inputs[i, 0] = kernel_half_w
+            func_inputs[i,1] = kernel_half_h
+            func_inputs[i,2:] = np.reshape(img_chunk, img_chunk_full_w * img_chunk_full_h, 1)
             i += 1
     return func_inputs
 
@@ -137,7 +146,7 @@ def lli_compile(func_source, func_name, inputs, in_size, out_r, out_c):
     shutil.copy2(func_source, 'temp_main.c')
     with open('temp_main.c', 'a') as f:
         f.write('int main() {\n')
-        f.write('    double inputs[%d][%d] = {\n' 
+        f.write('    double inputs[%d][%d] = {\n'
                 % (inputs.shape[0], inputs.shape[1]) )
         for idx, input_row in enumerate(inputs):
             f.write('        {')
@@ -186,9 +195,13 @@ def evaluate_approx(approx_infos, func_name, test_in, test_out):
         for input_row, output_row in zip(test_in, approx_outputs):
             approx_func(input_row, input_row.size, output_row, n_r, n_c)
         run_times.append(time.time() - t0)
+        _, test_grad_rows, test_grad_cols = np.gradient(test_out)
+        _, approx_grad_rows, approx_grad_cols = np.gradient(approx_outputs)
+        test_grad = np.array([test_grad_rows, test_grad_cols])
+        approx_grad = np.array([approx_grad_rows, approx_grad_cols])
         approx_files.append(approx_file)
         rms_errors.append(np.sqrt(mean_squared_error(test_out, approx_outputs)))
-        grad_errors.append(np.sqrt(mean_squared_error(np.gradient(test_out), np.gradient(approx_outputs))))
+        grad_errors.append(np.sqrt(mean_squared_error(test_grad, approx_grad)))
         train_times.append(approx_info['train_time'])
         outputs.append(approx_outputs)
 
@@ -240,7 +253,7 @@ if __name__ == '__main__':
     SOG_INPUT = 0
     MDP_INPUT = 1
     MED_INPUT = 2
-    input_type = SOG_INPUT
+    input_type = MED_INPUT
 
     if input_type == SOG_INPUT:
         # Option #1: Sum-of-Gaussians
@@ -260,7 +273,11 @@ if __name__ == '__main__':
         # Option #3: Median filter on an image
         func_name = 'filter'
         func_source = './inputs/medianfilter.c'
-        input_gen = lambda: generate_median_filter_inputs(5,5)
+        kernel_half_w = 3
+        kernel_half_h = 3
+        img_chunk_w = 30
+        img_chunk_h = 30
+        input_gen = lambda: generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img_chunk_h)
 
     #Set up approximator configs of interest
     approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source}),
@@ -277,8 +294,8 @@ if __name__ == '__main__':
     # Set the grid output size
     #We have to use a specific hardcoded size for the median filter domain (size of the test image in medianfilter.c)
     if input_type == MED_INPUT:
-        out_rows = 100
-        out_cols = 100
+        out_rows = img_chunk_w
+        out_cols = img_chunk_h
     #But modify the other problems as you see fit
     else:
         out_rows = 10
@@ -308,5 +325,5 @@ if __name__ == '__main__':
 
     print 'DONE'
 
-    normalize_plot_range = (input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
+    normalize_plot_range = True#(input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
     plot_results(approx_configs, outputs, errors, normalize_plot_range)
