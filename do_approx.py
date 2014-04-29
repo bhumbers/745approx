@@ -7,6 +7,7 @@ import random
 import shutil
 import time
 import timeit
+import subprocess
 
 from collections import namedtuple
 from ctypes import *
@@ -131,6 +132,39 @@ def generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_
         approx_infos.append(approx_info)
     return approx_infos
 
+
+def lli_compile(func_source, func_name, inputs, in_size, out_r, out_c):
+    shutil.copy2(func_source, 'temp_main.c')
+    with open('temp_main.c', 'a') as f:
+        f.write('int main() {\n')
+        f.write('    double inputs[%d][%d] = {\n' 
+                % (inputs.shape[0], inputs.shape[1]) )
+        for idx, input_row in enumerate(inputs):
+            f.write('        {')
+            for v in input_row:
+                f.write('%f, ' % v)
+            f.write('},\n')
+        f.write('    };\n')
+        f.write('    double output[%d];\n\n' % (out_r*out_c) )
+        f.write('    for (int i = 0; i < %d; i++) {\n' % inputs.shape[0])
+        f.write('        %s(inputs[i], %d, output, %d, %d);\n'
+                % (func_name, in_size, out_r, out_c) )
+        f.write("    }\n");
+        f.write("}\n");
+
+
+def get_approx_num_calls():
+    num_llvm_calls = 0
+
+    #args = '-emit-llvm -O3 -o out -c'.split() + ['temp_main.c']
+    #subprocess.check_call(['clang'] + args)
+    #args = '-stats -force-interpreter out'
+    #head_output = subprocess.check_output(['lli'] + args.split())
+    #print(head_output)
+    return num_llvm_calls
+
+
+
 def evaluate_approx(approx_infos, func_name, test_in, test_out):
     #For each approximator, evaluate approximator quality on test set, save or show to console
     approx_files = []
@@ -139,6 +173,7 @@ def evaluate_approx(approx_infos, func_name, test_in, test_out):
     outputs = []
     train_times = []
     run_times = []
+    calls = []
 
     n_r, n_c = test_out[0].shape
     for approx_info in approx_infos:
@@ -156,6 +191,10 @@ def evaluate_approx(approx_infos, func_name, test_in, test_out):
         grad_errors.append(np.sqrt(mean_squared_error(np.gradient(test_out), np.gradient(approx_outputs))))
         train_times.append(approx_info['train_time'])
         outputs.append(approx_outputs)
+
+        lli_compile(approx_file, func_name, test_in, np.size(test_in[0]), n_r, n_c)
+        calls.append(get_approx_num_calls())
+
 
     print 'RESULTS BY APPROXIMATOR:'
     print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime'
