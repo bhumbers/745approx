@@ -47,3 +47,10 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+#Latex output
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.pdf
