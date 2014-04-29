@@ -22,6 +22,11 @@ import func_compiler
 
 ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
 
+def generate_linear_inputs(num_inputs):
+    rnd = random.Random()
+    rnd.seed(42)
+    return np.random.random((num_inputs, 2))
+
 def generate_sum_of_gaussians_inputs(num_inputs, num_gaussians):
     rnd = random.Random()
     rnd.seed(42)
@@ -76,8 +81,6 @@ def generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img
     return func_inputs
 
 def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir):
-    #Define the C function interface nicely
-    #Source: http://stackoverflow.com/questions/5862915/passing-np-arrays-to-a-c-function-for-input-and-output
     orig_func = func_compiler.compile(func_source, func_name)
 
     save_results = True
@@ -125,15 +128,19 @@ def load_func_in_out_data(results_dir):
 def generate_approximators(approx_configs, func_name, trainIn, trainOut, approx_out_dir):
     approx_infos = []
     for approx_config in approx_configs:
+        print approx_config.name
+        t0 = time.time()
+
         approx_module = __import__(approx_config.module)
         approx_gen_class = getattr(approx_module, approx_config.gen_class)
         approx_gen = approx_gen_class(approx_config.params)
+
+        t0 = time.time()
         approx_gen.train(trainIn, trainOut)
+        t1 = time.time()
 
         approx_out_file = approx_config.name + '.c'
-        t0 = time.time()
         approx_gen.generate(approx_out_dir, approx_out_file, func_name)
-        t1 = time.time()
         approx_info = {}
         approx_info['file'] = join(approx_out_dir, approx_out_file)
         approx_info['train_time'] = t1 - t0
@@ -187,8 +194,6 @@ def get_approx_num_calls():
     #print(head_output)
     return num_callgrind_calls
 
-
-
 def evaluate_approx(approx_infos, func_name, test_in, test_out):
     #For each approximator, evaluate approximator quality on test set, save or show to console
     approx_files = []
@@ -202,6 +207,8 @@ def evaluate_approx(approx_infos, func_name, test_in, test_out):
     n_r, n_c = test_out[0].shape
     for approx_info in approx_infos:
         approx_file = approx_info['file']
+        print approx_file
+
         approx_outputs = np.zeros(test_out.shape)
         approx_func = func_compiler.compile(approx_file, func_name)
 
@@ -229,9 +236,9 @@ def evaluate_approx(approx_infos, func_name, test_in, test_out):
 
 
     print 'RESULTS BY APPROXIMATOR:'
-    print 'Name, RMSE, Gradient RMSE, Train time, Avg runtime, Calls'
+    print '%20s: %10s %10s %10s %10s %10s' % ('Name', 'RMSE', 'grad RMSE', 'train time', 'run time', 'calls')
     for name, rms_error, grad_error, train_time, run_time, call in zip(approx_files, rms_errors, grad_errors, train_times, run_times, calls):
-        print '%20s: %6.4f %6.4f %6.4f %6.4f %d' % (name, rms_error, grad_error, train_time, run_time, int(call))
+        print '%20s: %10.4f %10.4f %10.4f %10.4f %10d' % (name, rms_error, grad_error, train_time, run_time, int(call))
     return rms_errors, outputs
 
 def plot_results(configs, outputs, errors, normalize_range):
@@ -248,7 +255,7 @@ def plot_results(configs, outputs, errors, normalize_range):
     if normalize_range:
         a = outputs.min()
         b = outputs.max()
-        outputs = (254 * (outputs - a) / (b - a)).astype(np.uint8)
+        outputs = (.5 + 254 * (outputs - a) / (b - a)).astype(np.uint8)
 
     for o, err, c in zip(outputs, errors, configs):
         img = Image.new('L', (W*out_cols*D, H*out_cols*D))
@@ -272,6 +279,7 @@ if __name__ == '__main__':
     SOG_INPUT = 0
     MDP_INPUT = 1
     MED_INPUT = 2
+    LIN_INPUT = 3
     input_type = SOG_INPUT
 
     if input_type == SOG_INPUT:
@@ -298,10 +306,17 @@ if __name__ == '__main__':
         img_chunk_h = 30
         input_gen = lambda: generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img_chunk_h)
 
+    elif input_type == LIN_INPUT:
+        num_inputs = 500
+        func_name = 'linear'
+        func_source = './inputs/linear.c'
+        input_gen = lambda: generate_linear_inputs(num_inputs)
+
     #Set up approximator configs of interest
     approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source}),
                       ApproxConfig('linear_approx', 'LinearApproxGenerator', 'linear', {}),
                       ApproxConfig('neural_approx', 'NeuralNetApproxGenerator', 'neural', {}),
+                      ApproxConfig('svm_approx', 'SVMApproxGenerator', 'svm', {}),
                       ]
 
     #Generate some random sum-of-Gaussians inputs
@@ -320,14 +335,14 @@ if __name__ == '__main__':
         out_rows = 10
         out_cols = 10
     compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir)
+    inArray, outArray = load_func_in_out_data(results_dir)
 
     #APPROXIMATORS: Train & generate C function to replace original function
     # (NOTE: This part can & should be split out from in/out pair generation for original function)
 
     print 'Generator training...'
     #Split data into training & test sets
-    trainingFrac = 0.5
-    inArray, outArray = load_func_in_out_data(results_dir)
+    trainingFrac = 0.9
     N = inArray.shape[0]
     Ntrain = int(N * trainingFrac)
     trainIn = inArray[:Ntrain]
@@ -344,5 +359,5 @@ if __name__ == '__main__':
 
     print 'DONE'
 
-    normalize_plot_range = True#(input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
+    normalize_plot_range = True #(input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
     plot_results(approx_configs, outputs, errors, normalize_plot_range)
