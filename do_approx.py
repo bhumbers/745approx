@@ -67,7 +67,7 @@ def generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img
     #Size of little chunks that we'll cut the image into
     img_chunk_full_w = img_chunk_w + 2*kernel_half_w
     img_chunk_full_h = img_chunk_h + 2*kernel_half_h
-    num_inputs = int(math.floor(img_w / img_chunk_w) * math.floor(img_h / img_chunk_h))
+    num_inputs = int(math.floor((img_w-2*kernel_half_w) / img_chunk_w) * math.floor((img_h-2*kernel_half_h) / img_chunk_h))
     input_length = 2 + (img_chunk_full_w*img_chunk_full_h)
     func_inputs = np.zeros([num_inputs, input_length])
     i = 0
