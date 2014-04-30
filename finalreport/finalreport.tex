@@ -1,6 +1,7 @@
 \documentclass{article}
 
 \usepackage{fullpage}
+\usepackage{graphicx}
 
 \begin{document}
 
@@ -25,6 +26,12 @@ Although our project is restricted to software approximation schemes, our primar
 An alterative to marking specific code sections or functions as ``approximable'' is to instead label data items as either precise or approximate, as in the ``EnerJ'' extension to Java from \cite{Sampson11}. Users of EnerJ may set annotations for approximate data in a manner similar to constant data qualifiers. The compiler statically enforces restrictions on data flow from approximate to precise containers unless the user explicitly permits it.
 
 \section{Method}
+
+\begin{figure}
+  \centering
+  % \includegraphics[width=7in]{images/results_rmse}
+  \caption{TODO: System Diagram}
+\end{figure}
 
 We've implemented a compilation framework in python. Approximators derived from a base class specify how to generate a C file with an approximate version of the original function. In general, these approximators are machine learning models whose parameters are learned by training on various input/output examples. The parameter values that minimize error are incorporated into the approximate C code. That approximation code is then run from python and compared with the original.
 
@@ -80,7 +87,40 @@ We use these metrics to assess how close/good our approximations are.
 
 \section{Results}
 
+For each of the LIN, SOG, and MDP problem types, the approximators were trained on a set of 50 function input/output pairs and their quality was evaluated on a separate set of 50 test pairs. The output grids were of size $30 \times 30$ for LIN, SOG and MDP problem domains and size $20 \times 20$for the MED problem (the image chunk size).
+
+
 % Tables! Graphs! Pictures!
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/results_rmse}
+  \caption{Average test error values by approximation strategy on each of our input function domains.}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/results_grad_rmse}
+  \caption{Average error of the 2D gradient over the output grid by approximation strategy . Maintaining the gradient of the original function is desirable in order to preserver the local topology of the original function output.}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/results_run_time}
+  \caption{Average function runtime by approximation strategy.}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/results_train_time}
+  \caption{Average test error values by approximation strategy on each of our input function domains.}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/results_instructions}
+  \caption{Average number of instructions executed by approximation strategy on each of our input function domains.}
+\end{figure}
 
 \section{Discussion}
 

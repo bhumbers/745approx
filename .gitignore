@@ -55,11 +55,13 @@ nosetests.xml
 *.bbl
 *.blg
 *.fdb_latexmk
-*.pdf
 *.synctex.gz
 *.log
 
 temp_main.c
 callgrind.out.*
 out.txt
+
+finalreport/finalreport.pdf
+eval/*.pdf
 a.out
