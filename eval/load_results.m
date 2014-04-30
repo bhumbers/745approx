@@ -46,7 +46,6 @@ for result_idx = 1:5
     title(titles(result_idx));
     filename = ['results_', result_codes{result_idx}, '.pdf']
     set(gcf,'color','w');
-    box off
     grid off
     set(gcf, 'Position', [100, 100, 1000, 300]);
     set(findall(gcf,'type','text'),'fontSize',14,'fontWeight','bold')
@@ -67,6 +66,8 @@ for result_idx = 1:5
         end
         set(gca,'YTickLabel',ytickStr)
     end
+    
+    box off
     
     export_fig(filename);
     
