@@ -6,7 +6,7 @@ data_lin = csvimport('lin.csv');
 
 %SOG (Sum of Gaussians)
 data_sog = csvimport('sog_1_gaussians.csv');
-names = data_sog(2:end,1)
+names = data_sog(3:end,1)
 
 %MDP (Markov Decision Process)
 data_mdp = csvimport('mdp_1_rewards.csv');
@@ -38,7 +38,7 @@ for result_idx = 1:5
     end
 
     %Value plot
-    handle = bar(vals, 'BarLayout', 'grouped');
+    handle = bar(vals(:,2:end), 'BarLayout', 'grouped');
     legend(names, 'location', 'NorthWest');
     ylabel(ylabels(result_idx));
     xlabel('Problem Type');
