@@ -38,19 +38,34 @@ for result_idx = 1:5
     end
 
     %Value plot
-    bar(vals, 'BarLayout', 'grouped');
+    handle = bar(vals, 'BarLayout', 'grouped');
     legend(names, 'location', 'NorthWest');
     ylabel(ylabels(result_idx));
+    xlabel('Problem Type');
     set(gca,'XTickLabel', group_labels);
     title(titles(result_idx));
     filename = ['results_', result_codes{result_idx}, '.pdf']
     set(gcf,'color','w');
     box off
+    grid off
     set(gcf, 'Position', [100, 100, 1000, 300]);
     set(findall(gcf,'type','text'),'fontSize',14,'fontWeight','bold')
     %Use log scale for train time, runtime, and call counts
     if result_idx >= 3
-        %TODO
+        set(gca,'YScale','log')
+        %Use nicer y axis labels
+        yticks = get(gca, 'YTick');
+        ytickStr = []
+        for ytick = yticks
+            if (ytick < 0.1)
+                ytickStr = [ytickStr, sprintf('%1.3f|',ytick)];
+            elseif (ytick < 1)
+                ytickStr = [ytickStr, sprintf('%1.2f|',ytick)];
+            else
+               ytickStr = [ytickStr, sprintf('%1.0f|',ytick)];
+            end
+        end
+        set(gca,'YTickLabel',ytickStr)
     end
     
     export_fig(filename);
