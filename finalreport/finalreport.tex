@@ -23,14 +23,14 @@ In tandem with the renewed focus on parallel computing, interest in general purp
 
 Although our project is restricted to software approximation schemes, our primary motivation comes from \cite{Esmaeilzadeh12}, which presents a framework for offloading C++ function calls suitable for approximation to a programmable neural processing unit (NPU). Akin to graphics processing units (GPUs) used for accelerating raster graphic operations, the NPU is a computational accelerator designed to simulate neural network computations using decreased power and faster execution than is possible using a general purpose CPU. \cite{Amant14} builds on this approach with additional insights on compiling for analog circuit NPUs. The compiler is given a model of the restrictions of analog network computations (limited precision, non-ideal activation functions, and restrictions on network topologies) and generates function-approximating networks accordingly.
 
-An alterative to marking specific code sections or functions as ``approximable'' is to instead label data items as either precise or approximate, as in the ``EnerJ'' extension to Java from \cite{Sampson11}. Users of EnerJ may set annotations for approximate data in a manner similar to constant data qualifiers. The compiler statically enforces restrictions on data flow from approximate to precise containers unless the user explicitly permits it.
+An alternative to marking specific code sections or functions as ``approximable'' is to instead label data items as either precise or approximate, as in the ``EnerJ'' extension to Java from \cite{Sampson11}. Users of EnerJ may set annotations for approximate data in a manner similar to constant data qualifiers. The compiler statically enforces restrictions on data flow from approximate to precise containers unless the user explicitly permits it.
 
 \section{Method}
 
 \begin{figure}
   \centering
-  % \includegraphics[width=7in]{images/results_rmse}
-  \caption{TODO: System Diagram}
+  \includegraphics[width=4in]{images/diagram.png}
+  \caption{System diagram: Our approximation compiler evaluates functions on various inputs and uses the results to train approximators. It then implements these approximators as C functions.}
 \end{figure}
 
 We implemented a compilation framework in Python. Approximators derived from a base class specify how to generate a C file with an approximate version of the original function. In general, these approximators are machine learning models whose parameters are learned by training on various input/output examples. The parameter values that minimize error are incorporated into the approximate C code. That approximation code is then run from Python and compared with the original.
