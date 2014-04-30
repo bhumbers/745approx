@@ -25,7 +25,7 @@ rmses = [sog_rmse; mdp_rmse];
 group_labels = {'SOG', 'MDP'};
 
 %RMSE plot
-bar([rmse; grad_rmse], 'BarLayout', 'grouped');
+bar(rmses, 'BarLayout', 'grouped');
 legend(names);
 ylabel('RMSE');
 set(gca,'XTickLabel', group_labels);
