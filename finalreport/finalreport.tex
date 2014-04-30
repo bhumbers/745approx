@@ -12,16 +12,16 @@
 
 \section{Introduction}
 
-Approximate computing is a method of computation that sacrifices accuracy for computation time and energy. For certain problems, a large degree of precision may not be necessary, and the savings gained in battery life or power costs may be worth more than the accuracy lost. In particular, we are inspired by the RoboCup code, where speed in decision-making trades off with the optimality of the final decision. Approximate compilation is a promising way of implementing approximate computation that can be done on current machines.
+Approximate computing is a method of computation that sacrifices accuracy for computation time and energy. For certain problems, full precision may not be necessary, and the savings gained in battery life, execution time, or power costs may be worth more than the loss in accuracy. In particular, we are inspired by code for the RoboCup Small-Size League, where speed in decision-making trades off with the optimality of the final decision: a team's AI must be ready to send out commands regularly at 60 hertz, and it is important to make some decision at all, even if a robot is positioned at a slightly suboptimal location. Approximate compilation is a promising way of implementing approximate computation that can be done on current machines.
 
 In this project, we take several C functions and compile them into various approximators (also C functions, with the same function signature). We then analyze them to determine the speedup and how well they approximate the original.
 
 \section{Related Work}
-In tandem with the renewed focus on parallel computing, interest in general purpose approximate computing increased recently in response to the decelerating efficiency gains for traditional scalar microprocessors. Techniques in approximate compilation automatically produce inexact yet more efficient versions of programmer-specified ``approximable'' code regions or data structures. An approximating compiler is thus responsible for encapsulating the low-level implementation of approximated code derived, typically, from high level source. The programmer's input over how the approximation is implemented may only be binary (eg: annotating some functions as ``approximable'', as in \cite{Esmaeilzadeh12}), or they may be given finer-grained control over the tradeoff between accuracy and speedup of the approximation, as in the quality programmable machine instructions from \cite{Venkataramani13}.
+In tandem with the renewed focus on parallel computing, interest in general purpose approximate computing has increased recently in response to decelerating efficiency gains for traditional scalar microprocessors. Techniques in approximate compilation automatically produce inexact yet more efficient versions of programmer-specified ``approximable'' code regions or data structures. An approximating compiler is thus responsible for encapsulating the low-level implementation of approximated code derived, typically, from high level source. Programmers' input over how the approximation is implemented may only be binary (e.g., annotating some functions as ``approximable'', as in \cite{Esmaeilzadeh12}), or they may be given finer-grained control over the trade-off between accuracy and speedup of the approximation, as in the quality programmable machine instructions from \cite{Venkataramani13}.
 
 \cite{Agarwal09} introduces the SpeedPress compiler and SpeedGuard runtime which make use of an approximate compilation strategy that they term ``code perforation''. This strategy selectively drops iterations from long-lasting loops based on the current value of a user-defined quality metric. It has the advantage of allowing a computation to be dynamically retargeted for either realtime performance or accuracy, a useful property for time-critical systems.
 
-Although our project is restricted to software approximation schemes, our primary motivation comes from \cite{Esmaeilzadeh12}, which presents a framework for offloading C++ function calls suitable for approximation to a programmable neural processing unit (NPU). Akin to graphics processing units (GPUs) used for accelerating raster graphic operations, the NPU is a computational accelerator designed to simulate neural network computations using decreased power and faster execution than is possible using a general purpose CPU. \cite{Amant14} builds on this approach with additional insights on compiling for analog circuit NPUs. The compiler is given a model of the restrictions of analog network computations (limited precision, non-ideal activation functions, and restrictions on network topologies) and generates function-approximating networks accordingly.
+Although our project is restricted to software approximation schemes, our primary motivation comes from \cite{Esmaeilzadeh12}, which presents a framework for offloading C++ function calls suitable for approximation to a programmable neural processing unit (NPU). Akin to graphics processing units (GPUs), which are used for accelerating raster graphic operations, the NPU is a computational accelerator designed to simulate neural network computations using decreased power and faster execution than is possible using a general-purpose CPU. \cite{Amant14} builds on this approach with additional insights on compiling for analog circuit NPUs. The compiler is given a model of the restrictions of analog network computations (limited precision, non-ideal activation functions, and restrictions on network topologies) and generates function-approximating networks accordingly.
 
 An alternative to marking specific code sections or functions as ``approximable'' is to instead label data items as either precise or approximate, as in the ``EnerJ'' extension to Java from \cite{Sampson11}. Users of EnerJ may set annotations for approximate data in a manner similar to constant data qualifiers. The compiler statically enforces restrictions on data flow from approximate to precise containers unless the user explicitly permits it.
 
@@ -33,13 +33,30 @@ An alternative to marking specific code sections or functions as ``approximable'
   \caption{System diagram: Our approximation compiler evaluates functions on various inputs and uses the results to train approximators. It then implements these approximators as C functions.}
 \end{figure}
 
-We implemented a compilation framework in Python. Approximators derived from a base class specify how to generate a C file with an approximate version of the original function. In general, these approximators are machine learning models whose parameters are learned by training on various input/output examples. The parameter values that minimize error are incorporated into the approximate C code. That approximation code is then run from Python and compared with the original.
+We focused on a particular class of functions to approximate: those which take a list of doubles and generate a two-dimensional array of doubles as output. That corresponds to the following C signature, to which the target functions must conform:
+\begin{center}
+\begin{verbatim}
+        void f(int n_inst, double* input, int inputLen,
+               double* output, int outputRows, int outputCols)
+\end{verbatim}
+where:
+\begin{itemize}
+\item {\tt n\_inst} is the number of input vectors to read and output grids to write;
+\item {\tt input} is a pointer to the input values;
+\item {\tt inputLen} is the number of features within each input vector;
+\item {\tt output} is a pointer to the output matrix, which the function will fill with values; and
+\item {\tt outputRows} and {\tt outputCols} specify the dimension of the output grids.
+\end{itemize}
+\end{center}
+
+The reason for focusing on grid-structured outputs, rather than general lists of doubles, was the idea that we would be able to exploit properties such as continuity of the target function to improve the quality of approximations. Due to time constraints, we did not implement any such measures in our approximators, though we did rely on it for a gradient-based measure of closeness of fit.
+
+We implemented a compilation framework in Python. The main program is given a target C function and a means of generating inputs for it. It then takes a set of generated inputs, along with the corresponding outputs from the function, and passes them to the various approximators. Each approximator uses some machine learning model to learn parameters mapping from the given inputs to the given outputs. It then generates a new C file containing a function with the same signature as the original, but whose body uses the learned parameters to execute the machine learning model.
 
 \subsection{Approximators}
 
 \subsubsection{Linear regression}
-
-This approximates the original function by defining the function's value at each grid location to be a linear combination of all the input features. The weights defining the combinations are independent across locations. The approximation is learned using scikit-learn's linear model package. The weights and the simple code that evaluates the linear function using those weights are what is written to file.
+This approximates the original function by assuming the function's value at each grid location to be a linear combination of all the input features. The weights defining the combinations are independent across locations. The approximation is learned using scikit-learn's linear model package. The weights and the simple code that evaluates the linear function using those weights are what is written to file.
 
 \subsubsection{Neural networks}
 
@@ -51,7 +68,7 @@ The cascade method generates a network in which each hidden node has a connectio
 
 \subsubsection{SVM}
 
-Support vector machines (SVMs) can be used for regression (in which case the techinque is often referred to as ``support vector regression'' (SVR)). With nonlinear kernels, SVMs are capable of replicating a wide variety of functions. For the kernel function, we chose Gaussian radial basis functions, which are commonly used due to their versatility and relatively small number of hyperparameters. Since SVMs have a one-dimensional output, we trained an independent SVM for each grid location.
+Support vector machines (SVMs) can be used for regression (in which case the technique is often referred to as ``support vector regression'' (SVR)). With nonlinear kernels, SVMs are capable of replicating a wide variety of functions. For the kernel function, we chose Gaussian radial basis functions, which are commonly used due to their versatility and relatively small number of hyperparameters. Since SVMs have a one-dimensional output, we trained an independent SVM for each grid location.
 
 Due to the importance of the $C$ and $\gamma$ hyperparameters for good performance, we also performed cross-validation for those parameters. We designated a set of values for $C$ and for $\gamma$; for each training set, we used a subset of the data to train a separate grid of SVMs for each possible pair of values, tested each grid on the remaining training data, and chose the one with the best score as the final trained regressor.
 
@@ -66,11 +83,11 @@ Instead, we evaluated several other problem domains which stand in for typical p
 \begin{itemize}
 \item \textbf{Linear (LIN)} A basic problem type where each output grid value is a linear combination of the its grid coordinates. That is, the output value at grid location $(x, y)$ is $v = \alpha x + \beta y$, where the linear coefficients $\alpha$ and $\beta$ are constant over the whole grid and are used as the features for the approximators.
 
-\item \textbf{Sum of Gaussians (SOG)} The output of a function of this type is the sum of one or more Gaussian basis functions placed randomly on the grid. While calculating this function is rapid in quite rapid even without approximation, the terrain that it generates presents a good challenges for approximators, as it is non-linear in the function inputs.
+\item \textbf{Sum of Gaussians (SOG)} The output of a function of this type is the sum of one or more Gaussian basis functions placed randomly on the grid. While calculating this function is quite rapid even without approximation, the terrain that it generates presents good challenges for approximators, as it is non-linear in the function inputs.
 
-\item \textbf{Markov decision process (MDP)} The output of problems of this type is the solution to value iteration for a Markov decision process problem instance defined over the squares of the grid, emulating the planning of a robotic agent. The agent's state is a grid position $(x, y)$ and it may move deterministically in the four cardinal directions. One or more states are assigned a randomized reward value in the range $[0, 1]$. The computation cost of value iteration scales quickly for discount factors near unity and large grid state spaces, but it permits some imprecision in the computed values per state, as long as topological features of the output are preserved. This makes it a prime candidate domain for approximation.
+\item \textbf{Markov decision process (MDP)} The output of problems of this type is the solution to value iteration for a Markov decision process problem instance defined over a square grid, emulating the planning of a robotic agent. The agent's state is a grid position $(x, y)$ and it may move deterministically in the four cardinal directions. One or more states are assigned a randomized reward value in the range $[0, 1]$. The computation cost of value iteration increases quickly for discount factors near unity and large grid state spaces, but it permits some imprecision in the computed values per state, as long as topological features of the output are preserved. This makes it a prime candidate domain for approximation.
 
-\item \textbf{Median filter (MED)} A median filter is used in imaging processing applications to remove noisy pixels; however, performance degrades quickly for large filter window sizes. This function applies a median filter to a 2D input image with a filter window size of $7 \times 7$ pixels. While \cite{Esmaeilzadeh12} tested image filter approximations only at the per-pixel level, our approximators operate on pairs of two-dimensional input and output image patches (in order to keep the dimensionality of the approximation tractable, we limit the input and output images to size $20 \times 20$).
+\item \textbf{Median filter (MED)} A median filter is used in imaging processing applications to remove noisy pixels; however, performance degrades quickly for large filter window sizes. This function applies a median filter to a 2D input image with a filter window size of $7 \times 7$ pixels. While \cite{Esmaeilzadeh12} tested image filter approximations only at the per-pixel level, our approximators operate on pairs of two-dimensional input and output image patches (in order to keep the dimensionality of the approximation tractable, we limit the input and output images $20 \times 20$ pixels).
 \end{itemize}
 
 Note that we also considered the possibility of implementing an approximator scheme based on \textit{lookup tables}. However, we eliminated them as a viable option for our purposes, as their memory cost is intractable for the high dimensionality of our function inputs and outputs.
@@ -78,14 +95,13 @@ Note that we also considered the possibility of implementing an approximator sch
 \subsection{Metrics}
 
 \subsubsection{Error Metrics}
-We use two distinct metrics to evaluate the quality of each approximator: the \textit{absolute} and \textit{gradient} root-mean-square errors (RMSE).
+We use two metrics to evaluate the quality of each approximator: the \textit{absolute} and \textit{gradient} root-mean-square errors (RMSE).
 
 The absolute RMSE metric simply measures the element-wise error for each output grid entry relative to the original function output, averaged over all test cases. This is a reasonable metric for general accuracy but doesn't impose any cost for approximators that fail to preserve topological features of the original output grids.
 
 The gradient RMSE measures errors in the finite-difference gradient in the vertical and horizontal directions on the output grid, averaged over all test cases. Maintaining the gradient of the original function is desirable in order to preserve the local topology of the original function output.
 \subsubsection{Performance Metrics}
-
-In addition to output accuracy, we also evaluate approximators based on their execution performance, both in terms of compilation time and runtime speed. For the runtime measure, in addition to timing-based evaluation, we use valgrind's ``callgrind'' tool to count dynamic instruction executions while calling approximated functions. We chose this tool rather than using llvm's interpreter for profiling as it also captures instructions executed in external libraries used by the approximators in addition to instructions directly generated from the approximator source.
+In addition to output accuracy, we also evaluate approximators based on their execution performance, both in terms of compilation time and runtime speed. For the runtime measure, in addition to timing-based evaluation, we use Valgrind's ``callgrind'' tool to count dynamic instruction executions while calling approximated functions. We chose this tool rather than using llvm's interpreter for profiling as it also captures instructions executed in external libraries used by the approximators in addition to instructions directly generated from the approximator source.
 
 \section{Results}
 
