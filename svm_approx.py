@@ -13,6 +13,7 @@ class SVMApproxGenerator(ApproxGenerator):
         return 'svm'
 
     def train(self, inputs, outputs, params):
+        self.params = params
         self.p = inputs.shape[1]
         self.n_r = outputs.shape[1]    #size of output grid in rows
         self.n_c = outputs.shape[2]    #size of output grid in cols
@@ -35,8 +36,8 @@ class SVMApproxGenerator(ApproxGenerator):
                 # with open('%03d_%03d.dat' % (r, c), 'w') as f:
                 #     pickle.dump([x, y], f)
 
-                m = svm_train(y, x, '-s 3 -t 2 -q -p .001')
-                svm_save_model('%03d_%03d.svm' % (r, c), m)
+                m = svm_train(y, x, '-s 3 -t 2 -c %(C)f -g %(g)f -p .001 -q' % params)
+                svm_save_model('%03d_%03d_%03d.svm' % (params['index'], r, c), m)
 
     def generate(self, out_path, out_file, out_func_name):
         with open(path.join(out_path, out_file), 'w') as f:
@@ -61,7 +62,7 @@ void %(func)s(double input[p], int inputLen, double output[n_r][n_c], int _r, in
   in[p].index = -1;
   for(int r = 0; r < n_r; r++){
     for(int c = 0; c < n_c; c++){
-      sprintf(fn, "%%03d_%%03d.svm", r, c);
+      sprintf(fn, "%(index)03d_%%03d_%%03d.svm", r, c);
       //puts(fn);
       m = svm_load_model(fn);
 
@@ -75,4 +76,4 @@ void %(func)s(double input[p], int inputLen, double output[n_r][n_c], int _r, in
 }
 ''' % dict(func=out_func_name, p=self.p, n_r=self.n_r, n_c=self.n_c,
            in_min=self.in_min, in_scale=self.in_scale,
-           out_min=self.out_min, out_scale=self.out_scale)
+           out_min=self.out_min, out_scale=self.out_scale, index=self.params['index'])

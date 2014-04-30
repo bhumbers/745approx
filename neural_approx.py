@@ -43,7 +43,7 @@ class NeuralNetApproxGenerator(ApproxGenerator):
         data.set_train_data(inputs, outputs.reshape((-1, self.n_r*self.n_c)))
 
         #nn.train_on_data(data, 500, 10, .001)
-        nn.cascadetrain_on_data(data, 20, 1, .004)
+        nn.cascadetrain_on_data(data, 15, 1, .001)
 
         nn.save('nn.net')
         nn.destroy()
@@ -51,7 +51,6 @@ class NeuralNetApproxGenerator(ApproxGenerator):
     def generate(self, out_path, out_file, out_func_name):
         with open(path.join(out_path, out_file), 'w') as f:
             print >>f, '''
-#include <string.h>
 #include "doublefann.h"
 static const int p = %(p)d, n_r = %(n_r)d, n_c = %(n_c)d;
 static const double A = %(A)f, B = %(B)f;

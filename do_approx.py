@@ -21,6 +21,8 @@ import math
 
 import func_compiler
 
+prod = itertools.product
+
 ApproxConfig = namedtuple('ApproxConfig', ['module', 'gen_class', 'name', 'params'])
 EvalResult = namedtuple('EvalResult', ['name', 'hyperp', 'rms_error', 'grad_error', 'train_time', 'run_time', 'calls'])
 
@@ -134,23 +136,29 @@ def generate_approximators(approx_config, func_name, trainIn, trainOut, approx_o
     approx_gen_class = getattr(approx_module, approx_config.gen_class)
     approx_gen = approx_gen_class(approx_config.params)
 
+    items = approx_config.params['hyperp'].items()
+    ks = [a[0] for a in items]
+    vs = [a[1] for a in items]
+    print ks, vs
+    hyperps = [dict(zip(ks, vs2), index=i) for i, vs2 in enumerate(prod(*vs))]
+    print hyperps
+
     approx_info = {}
+    approx_info['config'] = approx_config
     approx_info['files'] = []
-    approx_info['hyperps'] = []
+    approx_info['hyperps'] = hyperps
     approx_info['train_times'] = []
-    for index, p in enumerate(approx_config.params['hyperp']):
+    for index, p in enumerate(hyperps):
         t0 = time.time()
         approx_gen.train(trainIn, trainOut, p)
         t1 = time.time()
 
-        approx_out_file = approx_config.name + str(index) + '.c'
+        approx_out_file = '%s%d.c' % (approx_config.name, index)
         approx_gen.generate(approx_out_dir, approx_out_file, func_name)
         approx_info['files'].append(join(approx_out_dir, approx_out_file))
-        approx_info['hyperps'].append(p)
         approx_info['train_times'].append(t1 - t0)
 
     return approx_info
-
 
 def lli_compile(func_source, func_name, inputs, in_size, out_r, out_c):
     shutil.copy2(func_source, 'temp_main.c')
@@ -175,7 +183,6 @@ def lli_compile(func_source, func_name, inputs, in_size, out_r, out_c):
 def get_approx_num_calls():
     num_callgrind_calls = 0
 
-    args = '-Ilibraries/pyfann/include temp_main.c -Llibraries/pyfann -std=c99 -ldoublefann -lm'
     args = (' -std=c99'
             ' -Ilibraries/pyfann/include -Llibraries/pyfann'
             ' -Ilibraries/libsvm -Llibraries/libsvm'
@@ -185,7 +192,7 @@ def get_approx_num_calls():
     print("Running valgrind (may take a while)...")
     args = '--tool=callgrind --log-file=out.txt ./a.out'
     callgrind_output = subprocess.check_output(['valgrind'] + args.split(),
-                        env={'LD_LIBRARY_PATH': 'libraries/pyfann:libraries/libsvm'})
+                                               env={'LD_LIBRARY_PATH': 'libraries/pyfann:libraries/libsvm'})
 
     # open output and parse to get calls
     with open('out.txt', 'r') as f:
@@ -206,20 +213,23 @@ def get_approx_num_calls():
 
 def evaluate_approx(approx_info, func_name, test_in, test_out):
     #For each approximator, evaluate approximator quality on test set, save or show to console
+    print 'evaluating:', approx_info['config'].name
 
     n_r, n_c = test_out[0].shape
     best_rmse = np.inf
     best_index = 0
 
+    approx_outputs = np.zeros(test_out.shape)
     for index, p in enumerate(approx_info['hyperps']):
         approx_file = approx_info['files'][index]
-        approx_outputs = np.zeros(test_out.shape)
+        approx_outputs[:] = 0
         approx_func = func_compiler.compile(approx_file, func_name)
 
         for input_row, output_row in zip(test_in, approx_outputs):
             approx_func(input_row, input_row.size, output_row, n_r, n_c)
         rmse = np.sqrt(mean_squared_error(test_out, approx_outputs))
-        if (rmse < best_rmse):
+        print 'rmse (%d): %f' % (index, rmse)
+        if rmse < best_rmse:
             best_rmse = rmse
             best_index = index
 
@@ -227,10 +237,12 @@ def evaluate_approx(approx_info, func_name, test_in, test_out):
 
     #Collect metrics on best approximator
     #Find error of each approximation output compared to the original output
+    approx_outputs[:] = 0
     t0 = time.time()
     best_approx_func = func_compiler.compile(best_approx_file, func_name)
     for input_row, output_row in zip(test_in, approx_outputs):
         best_approx_func(input_row, input_row.size, output_row, n_r, n_c)
+
     run_time = time.time() - t0
     _, test_grad_rows, test_grad_cols = np.gradient(test_out)
     _, approx_grad_rows, approx_grad_cols = np.gradient(approx_outputs)
@@ -333,7 +345,7 @@ if __name__ == '__main__':
         test_name = 'lin'
 
     #Generate some random sum-of-Gaussians inputs
-    print 'Input generation...'
+    print 'Input generation (%s)...' % func_source
     func_inputs = input_gen()
 
     #ORIGNAL FUNCTION: Compute grid output for each input row
@@ -364,12 +376,12 @@ if __name__ == '__main__':
     testOut = outArray[Ntrain:]
 
     #Generate list of hyperparameter tuples to be evaluated
-    linear_hyperparams = [1]
-    neural_hyperparams = [1] # Danny TODO
-    svm_hyperparams = [1] # Danny TODO
+    linear_hyperparams = {}
+    neural_hyperparams = {}
+    svm_hyperparams = {'C': [2**p for p in range(4, 8)], 'g': [2**p for p in range(4, 7)]}
 
     #Set up approximator configs of interest
-    approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source, 'hyperp': [1]}),
+    approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source, 'hyperp': {}}),
                       ApproxConfig('linear_approx', 'LinearApproxGenerator', 'linear', {'hyperp': linear_hyperparams}),
                       ApproxConfig('neural_approx', 'NeuralNetApproxGenerator', 'neural', {'hyperp': neural_hyperparams}),
                       ApproxConfig('svm_approx', 'SVMApproxGenerator', 'svm', {'hyperp': svm_hyperparams}),
@@ -379,6 +391,7 @@ if __name__ == '__main__':
     eval_results = []
     outputs = []
     approx_out_dir = './approx/'
+    print 'Testing...'
     for config in approx_configs:
         print('     Generating approx %s' % config.name)
         approx_info = generate_approximators(config, func_name, trainIn, trainOut, approx_out_dir)
