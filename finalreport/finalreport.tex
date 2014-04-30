@@ -17,7 +17,7 @@ Approximate computing is a method of computation that sacrifices accuracy for co
 In this project, we take several C functions and compile them into various approximators (also C functions, with the same function signature). We then analyze them to determine the speedup and how well they approximate the original.
 
 \section{Related Work}
-In tandem with the renewed focus on paralell computing, interest in general purpose approximate computing increased recently in response to the decelerating efficiency gains for traditional scalar microprocessors. Techniques in approximate compilation automatically produce inexact yet more efficient versions of programmer-specified ``approximable'' code regions or data structures. An approximating compiler is thus responsible for encapsulating the low-level implementation of approximated code derived, typically, from high level source. The programmer's input over how the approximation is implemented may only be binary (eg: annotating some functions as ``approximable'', as in \cite{Esmaeilzadeh12}), or they may be given finer-grained control over the tradeoff between accuracy and speedup of the approximation, as in the quality programmable machine instructions from \cite{Venkataramani13}.
+In tandem with the renewed focus on parallel computing, interest in general purpose approximate computing increased recently in response to the decelerating efficiency gains for traditional scalar microprocessors. Techniques in approximate compilation automatically produce inexact yet more efficient versions of programmer-specified ``approximable'' code regions or data structures. An approximating compiler is thus responsible for encapsulating the low-level implementation of approximated code derived, typically, from high level source. The programmer's input over how the approximation is implemented may only be binary (eg: annotating some functions as ``approximable'', as in \cite{Esmaeilzadeh12}), or they may be given finer-grained control over the tradeoff between accuracy and speedup of the approximation, as in the quality programmable machine instructions from \cite{Venkataramani13}.
 
 \cite{Agarwal09} introduces the SpeedPress compiler and SpeedGuard runtime which make use of an approximate compilation strategy that they term ``code perforation''. This strategy selectively drops iterations from long-lasting loops based on the current value of a user-defined quality metric. It has the advantage of allowing a computation to be dynamically retargeted for either realtime performance or accuracy, a useful property for time-critical systems.
 
@@ -33,21 +33,27 @@ An alterative to marking specific code sections or functions as ``approximable''
   \caption{TODO: System Diagram}
 \end{figure}
 
-We've implemented a compilation framework in python. Approximators derived from a base class specify how to generate a C file with an approximate version of the original function. In general, these approximators are machine learning models whose parameters are learned by training on various input/output examples. The parameter values that minimize error are incorporated into the approximate C code. That approximation code is then run from python and compared with the original.
+We implemented a compilation framework in Python. Approximators derived from a base class specify how to generate a C file with an approximate version of the original function. In general, these approximators are machine learning models whose parameters are learned by training on various input/output examples. The parameter values that minimize error are incorporated into the approximate C code. That approximation code is then run from Python and compared with the original.
 
 \subsection{Approximators}
 
 \subsubsection{Linear regression}
 
-This approximates the original function by defining the function output to be a linear combination of the features of the input. The approximation is learned using scikit-learn's linear model package. The weights and the simple code that evaluates the linear function using those weights are what is written to file.
+This approximates the original function by defining the function's value at each grid location to be a linear combination of the input features. The weights defining the combinations are independent across locations. The approximation is learned using scikit-learn's linear model package. The weights and the simple code that evaluates the linear function using those weights are what is written to file.
 
 \subsubsection{Neural networks}
 
-Similar to \cite{Esmaeilzadeh12}, we used a neural network to approximate functions. They were learned using a python implementation of FANN. FANN was used in the implementation of the approximation C code as well. % Danny: add any other notes here about what kind neural network we learned or whatnot
+Similar to \cite{Esmaeilzadeh12}, we used a neural network to approximate functions. Neural networks are often used for function approximation; their nonlinear nature means that with enough nodes and training data, any function can be approximated to arbitrary precision.
+
+We used FANN (the Fast Artificial Neural Network library) to learn the networks; in particular, we used its cascading mode, which uses the Cascade2 architecture~\cite{fahlman} to build up the structure of the output neural net one node at a time, rather than having to specify a topology at the beginning. This results in a much smaller final network than we could achieved with a fixed topology, which considerably reduces the time needed for evaluation, though it does increase the time needed for training.
+
+The cascade method generates a network in which each hidden node has a connection from all input nodes and to all later-added hidden nodes, as well as all output nodes. This allows for a rich connection structure with relatively few nodes, which gives the network expressivity without a high evaluation cost.
 
 \subsubsection{SVM}
 
-%TBA by Danny.
+Support vector machines (SVMs) can be used for regression (in which case the techinque is often referred to as ``support vector regression'' (SVR)). With nonlinear kernels, SVMs are capable of replicating a wide variety of functions. For the kernel function, we chose Gaussian radial basis functions, which are commonly used due to their versatility and relatively small number of hyperparameters. Since SVMs have a one-dimensional output, we trained an independent SVM for each grid location.
+
+Due to the importance of the $C$ and $\gamma$ hyperparameters for good performance, we also performed cross-validation for those parameters. We designated a set of values for $C$ and for $\gamma$; for each training set, we used a subset of the data to train a separate grid of SVMs for each possible pair of values, tested each grid on the remaining training data, and chose the one with the best score as the final trained regressor.
 
 \section{Evaluation}
 
