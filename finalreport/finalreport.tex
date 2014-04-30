@@ -46,14 +46,18 @@ Similar to \cite{Esmaeilzadeh12}, we used a neural network to approximate functi
 
 \subsection{Input Functions}
 
-Though this project was inspired by RoboCup, which involves evaluating the utility of passing the ball to certain locations on the field given the current location of robots, we ended up not having the time to try our approximators on RoboCup code. Instead, we evaluated several other problems of a similar nature (they all involve taking in a vector of features that describes properties of a 2-D grid and then outputting a 2-D grid of values).
+Our project was originally intended to be tested against inputs from a RoboCup planner agent, which would involve evaluating the utility of passing the ball to certain locations on the play field given the current location of robots. However, it became apparent that it would be be feasible neither to support the complex C++ function calls used in that code base nor to isolate an interesting problem that could be expressed independently of the main RoboCup code.
+
+Instead, we evaluated several other problem domains which stand in for typical problems that face a robotic agent. Each of the problems accepts a vector of input values and outputs a two-dimensional grid of values. The size of the input vector and output grid must be fixed when generating an approximator.
 
 \begin{itemize}
-\item \textbf{Sum of Gaussians:} The output of the original function is equivalent to the sum of 1, 2, or 10 Gaussians placed randomly on the input grid.
+\item \textbf{Linear (LIN)} A basic problem type where each output grid value is a linear combination of the its grid coordinates. That is, the output value at grid location $(x, y)$ is $v = \alpha x + \beta y$, where the linear coefficients $\alpha$ and $\beta$ are constant over the whole grid.
 
-\item \textbf{MDP:} The original function involves solving a Markov decision process type problem where 1, 2, or 10 reward states have been assigned to squares of the input grid. Instead of calculating the value function using standard AI algorithms, we replace it with approximators.
+\item \textbf{Sum of Gaussians (SOG)} The output of a function of this type is the sum of one or more Gaussian basis functions placed randomly on the grid. While calculating this function is rapid in quite rapid even without approximation, the terrain that it generates presents a good challenges for approximators, as it is non-linear in the function inputs.
 
-\item \textbf{Median filter:} The original function is a nonlinear filter applied to the pixels of an image.
+\item \textbf{Markov decision process (MDP)} The output of problems of this type is the solution to value iteration for a Markov decision process problem instance defined over the squares of the grid, emulating the planning of a robotic agent. The agent's state is a grid position $(x, y)$ and it may move deterministically in the four cardinal directions. One or more states are assigned a randomized reward value in the range $[0, 1]$. The computation cost of value iteration scales quickly for discount factors near unity and large grid state spaces, but it permits some imprecision in the computed values per state, as long as topological features of the output are preserved. This makes it a prime candidate domain for approximation.
+
+\item \textbf{Median filter (MED)} A median filter is used in imaging processing applications to remove noisy pixels; however, performance degrades quickly for large filter window sizes. This function applies a median filter to a 2D input image with a filter window size of $7 \times 7$ pixels. While \cite{Esmaeilzadeh12} tested image filter approximations only at the per-pixel level, our approximators operate on pairs of two-dimensional input and output image patches (in order to make keep the dimensionality of the approximation tractable, we limit the input/output images to size $20 \times 20$).
 \end{itemize}
 
 \subsection{Metrics}
