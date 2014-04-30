@@ -198,7 +198,6 @@ def get_approx_num_calls():
     #args = '-stats -force-interpreter out'
     #head_output = subprocess.check_output(['lli'] + args.split())
     #print(head_output)
-    print("DEBUG: Bottom of get_approx_num_calls()")
     return num_callgrind_calls
 
 

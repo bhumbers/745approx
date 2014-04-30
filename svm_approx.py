@@ -67,11 +67,11 @@ void %(func)s(double input[p], int inputLen, double output[n_r][n_c], int _r, in
 
       output[r][c] = svm_predict(m, in) * out_scale + out_min;
       //printf("%%5.2f ", output[r][c]);
+      svm_free_model_content(m);
+      svm_free_and_destroy_model(&m);
     }
   }
   //puts("");
-  svm_free_model_content(m);
-  svm_free_and_destroy_model(&m);
 }
 ''' % dict(func=out_func_name, p=self.p, n_r=self.n_r, n_c=self.n_c,
            in_min=self.in_min, in_scale=self.in_scale,
