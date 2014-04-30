@@ -306,10 +306,10 @@ if __name__ == '__main__':
 
     elif input_type == MDP_INPUT:
         # Option #2: MDP
-        num_inputs = 1000
+        num_inputs = 100
         func_name = 'compute_mdp_values'  #"basic_example"
         func_source = './inputs/mdp.c' #"./inputs/basic.c"
-        num_rewards = 2
+        num_rewards = 10
         discount_factor = 0.9  #reward discount factor for MDP
         input_gen = lambda: generate_mdp_inputs(num_inputs, num_rewards, discount_factor)
         test_name = ('mdp_%d_rewards' % num_rewards)
@@ -380,7 +380,9 @@ if __name__ == '__main__':
     outputs = []
     approx_out_dir = './approx/'
     for config in approx_configs:
+        print('     Generating approx %s' % config.name)
         approx_info = generate_approximators(config, func_name, trainIn, trainOut, approx_out_dir)
+        print('     Evaluating approx %s' % config.name)
         eval_result, output = evaluate_approx(approx_info, func_name, testIn, testOut)
         eval_results.append(eval_result)
         outputs.append(output)
