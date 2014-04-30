@@ -19,7 +19,7 @@ addpath('./export_fig');
 
 group_labels = {'LIN', 'SOG', 'MDP', 'MED'};
 titles = {'Average Test Set Absolute Error', 'Average Test Set Gradient Error', 'Average Approximator Training/Compile Time', 'Execution Time Relative to Original', 'Instructions Executed Relative to Original'};
-ylabels = {'RMS Error', 'RMS Error of Gradient', 'Normalized Training Time', 'Normalized Run Time', 'Normalized Instructions Executed'};
+ylabels = {'RMS Error', 'RMS Error of Gradient', 'Training Time (s)', 'Normalized Run Time', 'Normalized Instructions Executed'};
 result_codes = {'rmse', 'grad_rmse', 'train_time', 'run_time', 'instructions'};
 
 for result_idx = 1:5
@@ -32,8 +32,8 @@ for result_idx = 1:5
     med_vals = cell2mat(data_med(2:end,i))';
     vals = [lin_vals; sog_vals; mdp_vals; med_vals];
     
-    %Normalize training time, runtime, and call counts relative to original
-    if result_idx >= 3
+    %Normalize runtime and call counts relative to original
+    if result_idx >= 4
         vals = bsxfun(@rdivide, vals, vals(:,1));
     end
 
@@ -49,8 +49,8 @@ for result_idx = 1:5
     grid off
     set(gcf, 'Position', [100, 100, 1000, 300]);
     set(findall(gcf,'type','text'),'fontSize',14,'fontWeight','bold')
-    %Use log scale for train time, runtime, and call counts
-    if result_idx >= 3
+    %Use log scale for runtime and call counts
+    if result_idx >= 4
         set(gca,'YScale','log')
         %Use nicer y axis labels
         yticks = get(gca, 'YTick');
