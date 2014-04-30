@@ -93,6 +93,8 @@ def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols
     for inputIdx, inputRow in enumerate(func_inputs):
         func_output[:] = 0   #reset output before executing this call
         orig_func(inputRow, inputRow.size, func_output, out_rows, out_cols)
+        if inputIdx % 50 == 0:
+            print('Computing func result #%d' % inputIdx)
         # print 'Input #%d:\n%s\n' % (testIdx, inputRow)
         # print 'Output:\n%s\n' % funcOutput
         if save_results:
@@ -304,11 +306,11 @@ if __name__ == '__main__':
 
     elif input_type == MDP_INPUT:
         # Option #2: MDP
-        num_inputs = 40
+        num_inputs = 1000
         func_name = 'compute_mdp_values'  #"basic_example"
         func_source = './inputs/mdp.c' #"./inputs/basic.c"
-        num_rewards = 1
-        discount_factor = 0.7  #reward discount factor for MDP
+        num_rewards = 2
+        discount_factor = 0.9  #reward discount factor for MDP
         input_gen = lambda: generate_mdp_inputs(num_inputs, num_rewards, discount_factor)
         test_name = ('mdp_%d_rewards' % num_rewards)
 
@@ -343,15 +345,15 @@ if __name__ == '__main__':
         out_cols = img_chunk_h
     #But modify the other problems as you see fit
     else:
-        out_rows = 10
-        out_cols = 10
+        out_rows = 30
+        out_cols = 30
     compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols, results_dir)
     inArray, outArray = load_func_in_out_data(results_dir)
 
     #APPROXIMATORS: Train & generate C function to replace original function
     # (NOTE: This part can & should be split out from in/out pair generation for original function)
 
-    print 'Generator training...'
+    print 'Training generators...'
     #Split data into training & test sets
     trainingFrac = 0.9
     N = inArray.shape[0]
