@@ -162,6 +162,10 @@ Note also that the approximated functions only showed better runtime performance
   \label{fig:results_run_time}
 \end{figure}
 
+\section{Future Work}
+
+While simpler applications did not experience a speedup, more complex AI algorithms where complete accuracy is not essential have the potential to be sped up by being automatically replaced with an approximation at compile time. Future work could improve the versatility of this framework by designing it in a way such that it can handle arbitrary function signatures and C++ code. A smart compiler that can pick an appropriate approximation based on the results of running on some initial test inputs also has the potential to get speedups with relatively high accuracy at runtime.
+
 \section{Project Notes}
 \label{sec:project_notes}
 
