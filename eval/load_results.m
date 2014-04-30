@@ -6,7 +6,7 @@ data_lin = csvimport('lin.csv');
 
 %SOG (Sum of Gaussians)
 data_sog = csvimport('sog_1_gaussians.csv');
-names = data_sog(2:end,1)
+names = data_sog(3:end,1)
 
 %MDP (Markov Decision Process)
 data_mdp = csvimport('mdp_1_rewards.csv');
@@ -26,10 +26,10 @@ for result_idx = 1:5
     figure;
     
     i = result_idx + 1;
-    lin_vals = cell2mat(data_lin(2:end,i))';
-    sog_vals = cell2mat(data_sog(2:end,i))';
-    mdp_vals = cell2mat(data_mdp(2:end,i))';
-    med_vals = cell2mat(data_med(2:end,i))';
+    lin_vals = cell2mat(data_lin(3:end,i))';
+    sog_vals = cell2mat(data_sog(3:end,i))';
+    mdp_vals = cell2mat(data_mdp(3:end,i))';
+    med_vals = cell2mat(data_med(3:end,i))';
     vals = [lin_vals; sog_vals; mdp_vals; med_vals];
     
     %Normalize runtime and call counts relative to original
