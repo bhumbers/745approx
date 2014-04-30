@@ -145,6 +145,7 @@ def generate_approximators(approx_config, func_name, trainIn, trainOut, approx_o
 
     approx_info = {}
     approx_info['config'] = approx_config
+    approx_info['nice_name'] = approx_config.name
     approx_info['files'] = []
     approx_info['hyperps'] = hyperps
     approx_info['train_times'] = []
@@ -233,6 +234,7 @@ def evaluate_approx(approx_info, func_name, test_in, test_out):
             best_rmse = rmse
             best_index = index
 
+    best_approx_name = approx_info['nice_name']
     best_approx_file = approx_info['files'][best_index]
 
     #Collect metrics on best approximator
@@ -260,7 +262,7 @@ def evaluate_approx(approx_info, func_name, test_in, test_out):
     lli_compile(best_approx_file, func_name, sample_in, np.size(test_in[0]), n_r, n_c)
     calls = get_approx_num_calls()
 
-    return EvalResult(best_approx_file, approx_info['hyperps'][best_index], rms_error, grad_error, train_time, run_time, calls), outputs
+    return EvalResult(best_approx_name, approx_info['hyperps'][best_index], rms_error, grad_error, train_time, run_time, calls), outputs
 
 
 def plot_results(configs, outputs, normalize_range):
@@ -309,12 +311,12 @@ if __name__ == '__main__':
 
     if input_type == SOG_INPUT:
         # Option #1: Sum-of-Gaussians
-        num_inputs = 1000
+        num_inputs = 100
         func_name = 'sum_of_gaussians'
         func_source = './inputs/gaussian.c'
-        num_gaussians = 3
+        num_gaussians = 10
         input_gen = lambda: generate_sum_of_gaussians_inputs(num_inputs, num_gaussians)
-        test_name = ('sog_%d_gaussians' % num_inputs)
+        test_name = ('sog_%d_gaussians' % num_gaussians)
 
     elif input_type == MDP_INPUT:
         # Option #2: MDP
@@ -406,9 +408,10 @@ if __name__ == '__main__':
         print '%20s: %10.4f %10.4f %10.4f %10.4f %10d' % (result.name, result.rms_error, result.grad_error, result.train_time, result.run_time, int(result.calls))
 
     #Save results to CSV
-    print 'Saving results to CSV'
+    out_csv_filename = ('./eval/%s.csv' % test_name)
+    print('Saving results to CSV: %s' % out_csv_filename)
     import csv
-    with open(('./eval/%s.csv' % test_name), 'wb') as f:
+    with open(out_csv_filename, 'wb') as f:
         writer = csv.writer(f, delimiter=',', quoting=csv.QUOTE_NONE)
         writer.writerow(['Name', 'RMSE', 'Gradient RMSE', 'Training Time', 'Run Time', 'Calls'])
         for eval_result in eval_results:
