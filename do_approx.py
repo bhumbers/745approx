@@ -283,6 +283,7 @@ if __name__ == '__main__':
 
 
     results_dir = './results'
+    test_name = 'test'
 
     SOG_INPUT = 0
     MDP_INPUT = 1
@@ -290,12 +291,16 @@ if __name__ == '__main__':
     LIN_INPUT = 3
     input_type = MDP_INPUT
 
+    results_outfile = 'results.csv'
+
     if input_type == SOG_INPUT:
         # Option #1: Sum-of-Gaussians
         num_inputs = 1000
         func_name = 'sum_of_gaussians'
         func_source = './inputs/gaussian.c'
-        input_gen = lambda: generate_sum_of_gaussians_inputs(num_inputs, 3)
+        num_gaussians = 3
+        input_gen = lambda: generate_sum_of_gaussians_inputs(num_inputs, num_gaussians)
+        test_name = ('sog_%d_gaussians' % num_inputs)
 
     elif input_type == MDP_INPUT:
         # Option #2: MDP
@@ -305,6 +310,7 @@ if __name__ == '__main__':
         num_rewards = 1
         discount_factor = 0.7  #reward discount factor for MDP
         input_gen = lambda: generate_mdp_inputs(num_inputs, num_rewards, discount_factor)
+        test_name = ('mdp_%d_rewards' % num_rewards)
 
     elif input_type == MED_INPUT:
         # Option #3: Median filter on an image
@@ -312,15 +318,17 @@ if __name__ == '__main__':
         func_source = './inputs/medianfilter.c'
         kernel_half_w = 3
         kernel_half_h = 3
-        img_chunk_w = 30
-        img_chunk_h = 30
+        img_chunk_w = 20
+        img_chunk_h = 20
         input_gen = lambda: generate_median_filter_inputs(kernel_half_w, kernel_half_h, img_chunk_w, img_chunk_h)
+        test_name = ('med_I%dx%d_K%dx%d' % (img_chunk_w, img_chunk_h, kernel_half_w, kernel_half_h))
 
     elif input_type == LIN_INPUT:
         num_inputs = 500
         func_name = 'linear'
         func_source = './inputs/linear.c'
         input_gen = lambda: generate_linear_inputs(num_inputs)
+        test_name = 'lin'
 
     #Generate some random sum-of-Gaussians inputs
     print 'Input generation...'
@@ -380,7 +388,19 @@ if __name__ == '__main__':
     for result in eval_results:
         print '%20s: %10.4f %10.4f %10.4f %10.4f %10d' % (result.name, result.rms_error, result.grad_error, result.train_time, result.run_time, int(result.calls))
 
-    print 'DONE'
+    #Save results to CSV
+    print 'Saving results to CSV'
+    import csv
+    with open(('./eval/%s.csv' % test_name), 'wb') as f:
+        writer = csv.writer(f, delimiter=',', quoting=csv.QUOTE_NONE)
+        writer.writerow(['Name', 'RMSE', 'Gradient RMSE', 'Training Time', 'Run Time', 'Calls'])
+        for eval_result in eval_results:
+            row = [eval_result.name, eval_result.rms_error, eval_result.grad_error, eval_result.train_time, eval_result.run_time, int(eval_result.calls)]
+            writer.writerow(row)
 
+
+    print 'Plotting results to output images'
     normalize_plot_range = True#(input_type is not MED_INPUT) #MED already has output in 0-255 range, so don't normalize
     plot_results(approx_configs, outputs, normalize_plot_range)
+
+    print 'DONE'
