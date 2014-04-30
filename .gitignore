@@ -56,6 +56,10 @@ nosetests.xml
 *.blg
 *.fdb_latexmk
 *.pdf
+*.synctex.gz
+*.log
 
 temp_main.c
-*.out
+callgrind.out.*
+out.txt
+a.out
