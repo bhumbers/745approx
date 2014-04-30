@@ -132,7 +132,9 @@ void filter(double* input, int inputLen, double* output, int outputRows, int out
   int imgRows = outputRows + 2*halfKh;
   int imgCols = outputCols + 2*halfKw;
 
-  assert(inputLen == (2 + (outputRows+2*halfKh)*(outputCols+2*halfKw)));
+  // printf("Input img size: %d x %d\n", imgRows, imgCols);
+  // printf("Input kernel size: %d x %d\n", halfKh, halfKw);
+  assert(inputLen == (2 + imgRows*imgCols));
 
   // double* img = &(input[NUM_META_PARAMS]);
 
