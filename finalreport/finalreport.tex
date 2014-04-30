@@ -59,18 +59,18 @@ Due to the importance of the $C$ and $\gamma$ hyperparameters for good performan
 
 \subsection{Input Functions}
 
-Our project was originally intended to be tested against inputs from a RoboCup planner agent, which would involve evaluating the utility of passing the ball to certain locations on the play field given the current location of robots. However, it became apparent that it would be be feasible neither to support the complex C++ function calls used in that code base nor to isolate an interesting problem that could be expressed independently of the main RoboCup code.
+Our project was originally intended to be tested against inputs from a RoboCup planner agent, which would involve evaluating the utility of passing the ball to certain locations on the play field given the current state of the world (the locations and velocities of the robots and ball). However, it became apparent that it would be feasible neither to support the complex C++ function calls used in that code base nor to isolate an interesting problem that could be expressed independently of the main RoboCup code.
 
 Instead, we evaluated several other problem domains which stand in for typical problems that face a robotic agent. Each of the problems accepts a vector of input values and outputs a two-dimensional grid of values. The size of the input vector and output grid must be fixed when generating an approximator.
 
 \begin{itemize}
-\item \textbf{Linear (LIN)} A basic problem type where each output grid value is a linear combination of the its grid coordinates. That is, the output value at grid location $(x, y)$ is $v = \alpha x + \beta y$, where the linear coefficients $\alpha$ and $\beta$ are constant over the whole grid.
+\item \textbf{Linear (LIN)} A basic problem type where each output grid value is a linear combination of the its grid coordinates. That is, the output value at grid location $(x, y)$ is $v = \alpha x + \beta y$, where the linear coefficients $\alpha$ and $\beta$ are constant over the whole grid and are used as the features for the approximators.
 
 \item \textbf{Sum of Gaussians (SOG)} The output of a function of this type is the sum of one or more Gaussian basis functions placed randomly on the grid. While calculating this function is rapid in quite rapid even without approximation, the terrain that it generates presents a good challenges for approximators, as it is non-linear in the function inputs.
 
 \item \textbf{Markov decision process (MDP)} The output of problems of this type is the solution to value iteration for a Markov decision process problem instance defined over the squares of the grid, emulating the planning of a robotic agent. The agent's state is a grid position $(x, y)$ and it may move deterministically in the four cardinal directions. One or more states are assigned a randomized reward value in the range $[0, 1]$. The computation cost of value iteration scales quickly for discount factors near unity and large grid state spaces, but it permits some imprecision in the computed values per state, as long as topological features of the output are preserved. This makes it a prime candidate domain for approximation.
 
-\item \textbf{Median filter (MED)} A median filter is used in imaging processing applications to remove noisy pixels; however, performance degrades quickly for large filter window sizes. This function applies a median filter to a 2D input image with a filter window size of $7 \times 7$ pixels. While \cite{Esmaeilzadeh12} tested image filter approximations only at the per-pixel level, our approximators operate on pairs of two-dimensional input and output image patches (in order to make keep the dimensionality of the approximation tractable, we limit the input/output images to size $20 \times 20$).
+\item \textbf{Median filter (MED)} A median filter is used in imaging processing applications to remove noisy pixels; however, performance degrades quickly for large filter window sizes. This function applies a median filter to a 2D input image with a filter window size of $7 \times 7$ pixels. While \cite{Esmaeilzadeh12} tested image filter approximations only at the per-pixel level, our approximators operate on pairs of two-dimensional input and output image patches (in order to keep the dimensionality of the approximation tractable, we limit the input and output images to size $20 \times 20$).
 \end{itemize}
 
 \subsection{Metrics}
@@ -93,7 +93,7 @@ We use these metrics to assess how close/good our approximations are.
 
 \section{Results}
 
-For each of the LIN, SOG, and MDP problem types, the approximators were trained on a set of 50 function input/output pairs and their quality was evaluated on a separate set of 50 test pairs. The output grids were of size $30 \times 30$ for LIN, SOG and MDP problem domains and size $20 \times 20$for the MED problem (the image chunk size).
+For each of the LIN, SOG, and MDP problem types, the approximators were trained on a set of 50 function input/output pairs and their quality was evaluated on a separate set of 50 test pairs. The output grids were of size $30 \times 30$ for LIN, SOG, and MDP problem domains and size $20 \times 20$ for the MED problem (the image chunk size).
 
 
 % Tables! Graphs! Pictures!
@@ -107,7 +107,7 @@ For each of the LIN, SOG, and MDP problem types, the approximators were trained 
 \begin{figure}
   \centering
   \includegraphics[width=0.8\textwidth]{images/results_grad_rmse}
-  \caption{Average error of the 2D gradient over the output grid by approximation strategy . Maintaining the gradient of the original function is desirable in order to preserver the local topology of the original function output.}
+  \caption{Average error of the 2D gradient over the output grid by approximation strategy. Maintaining the gradient of the original function is desirable in order to preserve the local topology of the original function output.}
 \end{figure}
 
 \begin{figure}
@@ -131,6 +131,8 @@ For each of the LIN, SOG, and MDP problem types, the approximators were trained 
 \section{Discussion}
 
 \section{Project Notes}
+
+Specialized hardware is an important factor when it comes to execution efficiency, and one to which we did not have access while working on this project. Esmaeilzadeh~\cite{Esmaeilzadeh12} used a specially-designed ASIC to enable values in neural networks to be computed extremely quickly; since we were limited to software solutions, our approximators were typically slower than the original code, often significantly. However, the hope is that, for any of the approximator types, it would be possible to implement that approximator efficiently in hardware, whereas it would be much more difficult to implement similar hardware for the original general functions.
 
 \bibliographystyle{ieeetr}
 \bibliography{sources}
