@@ -18,38 +18,44 @@ addpath('./sdf');
 addpath('./export_fig');
 
 group_labels = {'LIN', 'SOG', 'MDP', 'MED'};
-titles = {'RMSE', 'Gradient Error', 'Training Time', 'Run Time', 'Calls'}
-result_codes = {'rmse', 'grad_rmse', 'run_time', 'train_time', 'instructions'}
+titles = {'Average Test Set Absolute Error', 'Average Test Set Gradient Error', 'Average Approximator Training/Compile Time', 'Execution Time Relative to Original', 'Instructions Executed Relative to Original'};
+ylabels = {'RMS Error', 'RMS Error of Gradient', 'Normalized Training Time', 'Normalized Run Time', 'Normalized Instructions Executed'};
+result_codes = {'rmse', 'grad_rmse', 'train_time', 'run_time', 'instructions'};
 
-result_idx = 1
-for i = 2:6
+for result_idx = 1:5
     figure;
     
-    lin_rmse = cell2mat(data_lin(2:end,i))';
-    sog_rmse = cell2mat(data_sog(2:end,i))';
-    mdp_rmse = cell2mat(data_mdp(2:end,i))';
-    med_rmse = cell2mat(data_med(2:end,i))';
-    rmses = [lin_rmse; sog_rmse; mdp_rmse; med_rmse];
+    i = result_idx + 1;
+    lin_vals = cell2mat(data_lin(2:end,i))';
+    sog_vals = cell2mat(data_sog(2:end,i))';
+    mdp_vals = cell2mat(data_mdp(2:end,i))';
+    med_vals = cell2mat(data_med(2:end,i))';
+    vals = [lin_vals; sog_vals; mdp_vals; med_vals];
+    
+    %Normalize training time, runtime, and call counts relative to original
+    if result_idx >= 3
+        vals = bsxfun(@rdivide, vals, vals(:,1));
+    end
 
-    %RMSE plot
-    bar(rmses, 'BarLayout', 'grouped');
+    %Value plot
+    bar(vals, 'BarLayout', 'grouped');
     legend(names, 'location', 'NorthWest');
-    ylabel(titles(i-1));
+    ylabel(ylabels(result_idx));
     set(gca,'XTickLabel', group_labels);
-    title(titles(i-1));
+    title(titles(result_idx));
     filename = ['results_', result_codes{result_idx}, '.pdf']
     set(gcf,'color','w');
     box off
     set(gcf, 'Position', [100, 100, 1000, 300]);
     set(findall(gcf,'type','text'),'fontSize',14,'fontWeight','bold')
-    %Use log scale for runtime, train time, and call counts
-    if i >= 4
-        
+    %Use log scale for train time, runtime, and call counts
+    if result_idx >= 3
+        %TODO
     end
     
     export_fig(filename);
     
-    result_idx = result_idx + 1
+    result_idx = result_idx + 1;
 end
 
 %sdf('10_701'); %apply a style (if available... which is not on most machines other than Ben's)
