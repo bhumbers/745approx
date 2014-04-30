@@ -122,7 +122,7 @@ int intcmp(const void *aa, const void *bb)
 //   if (idx >= size) idx = size+size - idx - 1;
 // }
 
-void filter(double* input, int inputLen, double* output, int outputRows, int outputCols)
+void filter_single(double* input, int inputLen, double* output, int outputRows, int outputCols)
 {
   const int NUM_META_PARAMS;
   int halfKw = input[0];  //filter kernel half width
@@ -169,4 +169,12 @@ void filter(double* input, int inputLen, double* output, int outputRows, int out
     }
   }
   free(neighborhood);
+}
+
+void filter(int n_inst, double* input, int inputLen, double* output, int outputRows, int outputCols) {
+  for(int n = 0; n < n_inst; n++) {
+    filter_single(input + n*inputLen, inputLen,
+                  output + n * outputRows * outputCols,
+                  outputRows, outputCols);
+  }
 }

@@ -67,17 +67,19 @@ class LinearApproxGenerator(ApproxGenerator):
 
             #Standard function signature for our compiler
             #(TODO: move this to shared func?)
-            print >>f, 'void %s(double input[p], int inputLen, double output[n_r][n_c], int outputRows, int outputCols){' % out_func_name
+            print >>f, 'void %s(int n_inst, double input[][p], int inputLen, double output[][n_r][n_c], int outputRows, int outputCols){' % out_func_name
 
             #Write nested loop summation code for the function call
             print >>f, '''
-  for (int r = 0; r < n_r; r++) {
-    for (int c = 0; c < n_c; c++) {
-      double val = W[r][c][p];
-      for (int i = 0; i < p; i++) {
-        val += input[i] * W[r][c][i];
+  for(int n = 0; n < n_inst; n++) {
+    for (int r = 0; r < n_r; r++) {
+      for (int c = 0; c < n_c; c++) {
+        double val = W[r][c][p];
+        for (int i = 0; i < p; i++) {
+          val += input[n][i] * W[r][c][i];
+        }
+        output[n][r][c] = val;
       }
-      output[r][c] = val;
     }
   }
 }

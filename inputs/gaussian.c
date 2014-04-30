@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <math.h>
 
-void sum_of_gaussians(double* input, int inputLen, double* output, int outputRows, int outputCols)
+void sum_of_gaussians_single(double* input, int inputLen, double* output, int outputRows, int outputCols)
 {
   //Inputs should be 5-tuples: the 2D mean, 2D variance, and amplitude per Gaussian
   assert(inputLen % 5 == 0);
@@ -25,5 +25,14 @@ void sum_of_gaussians(double* input, int inputLen, double* output, int outputRow
         output[row*outputCols + col] += val;
       }
     }
+  }
+}
+
+void sum_of_gaussians(int n_inst, double* input, int inputLen, double* output, int outputRows, int outputCols)
+{
+  for(int n = 0; n < n_inst; n++) {
+    sum_of_gaussians_single(input + n*inputLen, inputLen,
+                            output + n * outputRows * outputCols,
+                            outputRows, outputCols);
   }
 }

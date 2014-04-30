@@ -8,7 +8,8 @@ import numpy as np
 ## source: http://stackoverflow.com/questions/5862915/
 def set_signature(func_handle):
     func_handle.restype = None
-    func_handle.argtypes = [np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
+    func_handle.argtypes = [ctypes.c_int,
+                            np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
                             ctypes.c_int,
                             np.ctypeslib.ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"),
                             ctypes.c_int,

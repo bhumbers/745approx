@@ -39,7 +39,7 @@ double transition_probability(int rowCurr, int colCurr, int rowNext, int colNext
   return 0;
 }
 
-void compute_mdp_values(double* input, int inputLen, double* output, int outputRows, int outputCols) {
+void compute_mdp_values_single(double* input, int inputLen, double* output, int outputRows, int outputCols) {
   int NUM_GRID_ENTRIES = outputRows * outputCols;
 
   const double STOP_RESID = 0.001;
@@ -122,4 +122,12 @@ void compute_mdp_values(double* input, int inputLen, double* output, int outputR
   // printf("FINAL RESIDUAL AT ITER %d: %f\n", currIter, currMaxResidual);
 
   free(R);
+}
+
+void compute_mdp_values(int n_inst, double* input, int inputLen, double* output, int outputRows, int outputCols) {
+  for(int n = 0; n < n_inst; n++) {
+    compute_mdp_values_single(input + n*inputLen, inputLen,
+                              output + n * outputRows * outputCols,
+                              outputRows, outputCols);
+  }
 }

@@ -94,7 +94,7 @@ def compute_func_results(func_source, func_name, func_inputs, out_rows, out_cols
         os.makedirs(results_dir)
     for inputIdx, inputRow in enumerate(func_inputs):
         func_output[:] = 0   #reset output before executing this call
-        orig_func(inputRow, inputRow.size, func_output, out_rows, out_cols)
+        orig_func(1, inputRow, inputRow.size, func_output, out_rows, out_cols)
         if inputIdx % 50 == 0:
             print('Computing func result #%d' % inputIdx)
         # print 'Input #%d:\n%s\n' % (testIdx, inputRow)
@@ -141,7 +141,6 @@ def generate_approximators(approx_config, func_name, trainIn, trainOut, approx_o
     vs = [a[1] for a in items]
     print ks, vs
     hyperps = [dict(zip(ks, vs2), index=i) for i, vs2 in enumerate(prod(*vs))]
-    print hyperps
 
     approx_info = {}
     approx_info['config'] = approx_config
@@ -190,7 +189,7 @@ def get_approx_num_calls():
             ' temp_main.c -ldoublefann -lm -lsvm')
     subprocess.check_call(['gcc'] + args.split())
 
-    print("Running valgrind (may take a while)...")
+    print "Running valgrind (may take a while)..."
     args = '--tool=callgrind --log-file=out.txt ./a.out'
     callgrind_output = subprocess.check_output(['valgrind'] + args.split(),
                                                env={'LD_LIBRARY_PATH': 'libraries/pyfann:libraries/libsvm'})
@@ -226,8 +225,8 @@ def evaluate_approx(approx_info, func_name, test_in, test_out):
         approx_outputs[:] = 0
         approx_func = func_compiler.compile(approx_file, func_name)
 
-        for input_row, output_row in zip(test_in, approx_outputs):
-            approx_func(input_row, input_row.size, output_row, n_r, n_c)
+        approx_func(test_in.shape[0], test_in, test_in[0].size,
+                    approx_outputs, n_r, n_c)
         rmse = np.sqrt(mean_squared_error(test_out, approx_outputs))
         print 'rmse (%d): %f' % (index, rmse)
         if rmse < best_rmse:
@@ -242,8 +241,8 @@ def evaluate_approx(approx_info, func_name, test_in, test_out):
     approx_outputs[:] = 0
     t0 = time.time()
     best_approx_func = func_compiler.compile(best_approx_file, func_name)
-    for input_row, output_row in zip(test_in, approx_outputs):
-        best_approx_func(input_row, input_row.size, output_row, n_r, n_c)
+    best_approx_func(test_in.shape[0], test_in, test_in[0].size,
+                     approx_outputs, n_r, n_c)
 
     run_time = time.time() - t0
     _, test_grad_rows, test_grad_cols = np.gradient(test_out)
@@ -377,10 +376,12 @@ if __name__ == '__main__':
     testIn = inArray[Ntrain:]
     testOut = outArray[Ntrain:]
 
+    print 'n_train: %d n_test %d' % (Ntrain, N - Ntrain)
+
     #Generate list of hyperparameter tuples to be evaluated
     linear_hyperparams = {}
     neural_hyperparams = {}
-    svm_hyperparams = {'C': [2**p for p in range(4, 8)], 'g': [2**p for p in range(4, 7)]}
+    svm_hyperparams = {'C': [2**p for p in range(-2, 7)], 'g': [2**p for p in range(0, 7)]}
 
     #Set up approximator configs of interest
     approx_configs = [ApproxConfig('dummy_approx', 'DummyApproxGenerator', 'dummy', {'src': func_source, 'hyperp': {}}),
